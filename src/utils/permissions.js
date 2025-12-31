@@ -1,0 +1,19 @@
+export const hasPermission = (user, action) => {
+    const role = user?.user_metadata?.role;
+    if (!role) return false;
+
+    if (role === 'admin' || role === 'superadmin') return true; // Superadmin/Admin has all permissions by default
+
+    switch (action) {
+        case 'validate_results':
+        case 'manage_lots':
+            return role === 'biochemist';
+
+        case 'create_user':
+        case 'delete_equipment':
+            return false; // Only admin (handled by the check above)
+
+        default:
+            return true; // Default to allow basic logging/viewing if not strictly restricted
+    }
+};

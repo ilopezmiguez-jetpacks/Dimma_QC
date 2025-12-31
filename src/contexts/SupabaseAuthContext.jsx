@@ -12,14 +12,14 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = useCallback(async (authUser) => {
     if (!authUser) return null;
-    
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url')
+        .select('full_name, avatar_url, role, laboratory_id, laboratory:laboratories(name)')
         .eq('id', authUser.id)
         .maybeSingle();
-        
+
       if (error) {
         console.error("Error fetching user profile:", error.message);
         return null;
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }) => {
       });
     }
   }, [toast]);
-  
+
   const value = useMemo(() => ({
     user,
     session,

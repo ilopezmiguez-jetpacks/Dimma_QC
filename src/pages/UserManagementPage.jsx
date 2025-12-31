@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, UserPlus, Edit, Trash2, Shield, Building2, Key } from 'lucide-react';
+import { hasPermission } from '@/utils/permissions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,19 +28,23 @@ const UserManagementPage = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  
+
   const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
+    fullName: '',
     password: '',
     role: 'technician',
     laboratoryId: ''
   });
 
-  const { session } = useAuth();
+  const { user: currentUser, session } = useAuth();
   const { toast } = useToast();
 
+  const canManageUsers = hasPermission(currentUser, 'create_user');
+
   const fetchAllData = async () => {
+    // ... (fetchAllData implementation remains unchanged)
     setLoading(true);
     try {
       // 1. Fetch Laboratories
@@ -47,32 +52,37 @@ const UserManagementPage = () => {
         .from('laboratories')
         .select('id, name')
         .eq('is_active', true);
-      
+
       if (labsError) throw labsError;
       setLaboratories(labsData || []);
 
-      // 2. Fetch Users (via Edge Function to get Auth data)
-      const { data: usersData, error: usersError } = await supabase.functions.invoke('get-users', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-
-      if (usersError) throw usersError;
-      
-      // 3. Fetch Profiles to get Lab assignments
+      // 2. Fetch Profiles directly
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, laboratory_id');
+        .select(`
+          id, 
+          email, 
+          full_name, 
+          role, 
+          laboratory_id, 
+          created_at,
+          is_authorized
+        `)
+        .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
 
-      // Merge data
-      const mergedUsers = (usersData.users || []).map(u => {
-        const profile = profilesData.find(p => p.id === u.id);
-        return {
-          ...u,
-          laboratoryId: profile?.laboratory_id || null
-        };
-      });
+      // 3. Map profile data
+      const mergedUsers = profilesData.map(p => ({
+        id: p.id,
+        email: p.email,
+        laboratoryId: p.laboratory_id,
+        user_metadata: {
+          full_name: p.full_name,
+          role: p.role
+        },
+        email_confirmed_at: p.created_at
+      }));
 
       setUsers(mergedUsers);
     } catch (error) {
@@ -88,8 +98,8 @@ const UserManagementPage = () => {
   }, [session]);
 
   const handleCreateUser = async () => {
-    if (!formData.email || !formData.password || !formData.laboratoryId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Email, contraseña y laboratorio son requeridos.' });
+    if (!formData.email || !formData.password || !formData.laboratoryId || !formData.fullName) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Email, nombre completo, contraseña y laboratorio son requeridos.' });
       return;
     }
 
@@ -98,24 +108,26 @@ const UserManagementPage = () => {
       const { data, error } = await supabase.functions.invoke('create-user', {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
         body: {
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-            fullName: formData.email.split('@')[0] // Default name
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          fullName: formData.fullName
         }
       });
+
+
 
       if (error || data.error) throw new Error(error?.message || data.error);
 
       // 2. Assign Laboratory (Update Profile)
       const newUserId = data.user?.id || data.id;
       if (newUserId) {
-         const { error: profileError } = await supabase
+        const { error: profileError } = await supabase
           .from('profiles')
           .update({ laboratory_id: formData.laboratoryId })
           .eq('id', newUserId);
-         
-         if (profileError) throw profileError;
+
+        if (profileError) throw profileError;
       }
 
       toast({ title: 'Usuario creado', description: 'El usuario ha sido creado correctamente.' });
@@ -137,6 +149,7 @@ const UserManagementPage = () => {
           userId: selectedUser.id,
           role: formData.role,
           laboratoryId: formData.laboratoryId,
+          fullName: formData.fullName,
           password: formData.password || undefined // Only send if changed
         }
       });
@@ -176,6 +189,7 @@ const UserManagementPage = () => {
     setSelectedUser(user);
     setFormData({
       email: user.email,
+      fullName: user.user_metadata?.full_name || '',
       password: '', // Blank by default
       role: user.user_metadata?.role || 'technician',
       laboratoryId: user.laboratoryId || ''
@@ -189,7 +203,7 @@ const UserManagementPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ email: '', password: '', role: 'technician', laboratoryId: '' });
+    setFormData({ email: '', fullName: '', password: '', role: 'technician', laboratoryId: '' });
     setSelectedUser(null);
   };
 
@@ -207,9 +221,11 @@ const UserManagementPage = () => {
           <h2 className="text-2xl font-bold tracking-tight">Gestión de Usuarios</h2>
           <p className="text-muted-foreground">Administración centralizada de cuentas, roles y accesos a laboratorios.</p>
         </div>
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="medical-gradient text-white">
-          <UserPlus className="w-4 h-4 mr-2" /> Agregar Usuario
-        </Button>
+        {canManageUsers && (
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="medical-gradient text-white">
+            <UserPlus className="w-4 h-4 mr-2" /> Agregar Usuario
+          </Button>
+        )}
       </div>
 
       <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
@@ -244,29 +260,31 @@ const UserManagementPage = () => {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {u.email_confirmed_at ? 
-                    <Badge variant="success" className="text-xs">Confirmado</Badge> : 
+                  {u.email_confirmed_at ?
+                    <Badge variant="success" className="text-xs">Confirmado</Badge> :
                     <Badge variant="warning" className="text-xs">Pendiente</Badge>
                   }
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEditModal(u)}>
-                      <Edit className="w-4 h-4 text-blue-600" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => openDeleteAlert(u)}>
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </Button>
-                  </div>
+                  {canManageUsers && (
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(u)}>
+                        <Edit className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => openDeleteAlert(u)}>
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
             {users.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No hay usuarios registrados.
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  No hay usuarios registrados.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -281,26 +299,34 @@ const UserManagementPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre Completo</label>
+              <Input
+                value={formData.fullName}
+                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                placeholder="Juan Pérez"
+              />
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
-              <Input 
-                value={formData.email} 
-                onChange={e => setFormData({...formData, email: e.target.value})}
+              <Input
+                value={formData.email}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
                 placeholder="usuario@dimmatec.com"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Contraseña</label>
-              <Input 
+              <Input
                 type="password"
-                value={formData.password} 
-                onChange={e => setFormData({...formData, password: e.target.value})}
+                value={formData.password}
+                onChange={e => setFormData({ ...formData, password: e.target.value })}
                 placeholder="********"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Rol</label>
-                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="technician">Técnico</SelectItem>
@@ -311,7 +337,7 @@ const UserManagementPage = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Laboratorio</label>
-                <Select value={formData.laboratoryId} onValueChange={v => setFormData({...formData, laboratoryId: v})}>
+                <Select value={formData.laboratoryId} onValueChange={v => setFormData({ ...formData, laboratoryId: v })}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>
                     {laboratories.map(lab => (
@@ -338,26 +364,35 @@ const UserManagementPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-               <label className="text-sm font-medium">Email</label>
-               <Input value={formData.email} disabled className="bg-gray-100" />
+              <label className="text-sm font-medium">Nombre Completo</label>
+              <Input
+                value={formData.fullName}
+                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                placeholder="Juan Pérez"
+              />
             </div>
-            
+
             <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                    <Key className="w-3 h-3" /> Nueva Contraseña (Opcional)
-                </label>
-                <Input 
-                    type="password"
-                    value={formData.password} 
-                    onChange={e => setFormData({...formData, password: e.target.value})}
-                    placeholder="Dejar vacío para mantener la actual"
-                />
+              <label className="text-sm font-medium">Email</label>
+              <Input value={formData.email} disabled className="bg-gray-100" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Key className="w-3 h-3" /> Nueva Contraseña (Opcional)
+              </label>
+              <Input
+                type="password"
+                value={formData.password}
+                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Dejar vacío para mantener la actual"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Rol</label>
-                <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="technician">Técnico</SelectItem>
@@ -368,7 +403,7 @@ const UserManagementPage = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Laboratorio</label>
-                <Select value={formData.laboratoryId} onValueChange={v => setFormData({...formData, laboratoryId: v})}>
+                <Select value={formData.laboratoryId} onValueChange={v => setFormData({ ...formData, laboratoryId: v })}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>
                     {laboratories.map(lab => (

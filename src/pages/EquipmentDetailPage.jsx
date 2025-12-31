@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { useQCData } from '@/contexts/QCDataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient'; // Included import
+import { hasPermission } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -273,6 +274,7 @@ const EquipmentDetailPage = () => {
   const qcParamsForChart = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
   const canSubmit = selectedLevel && activeLot?.qc_params?.[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).length > 0 && Object.keys(activeLot.qc_params[selectedLevel]).every(param => inputValues[param]);
   const yAxisLabel = qcParamsForChart?.unit ? { value: qcParamsForChart.unit, angle: -90, position: 'insideLeft', offset: 10 } : null;
+  const canDeleteEquipment = hasPermission(user, 'delete_equipment');
   const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
 
   return (
@@ -307,28 +309,30 @@ const EquipmentDetailPage = () => {
                 <Button onClick={() => setIsEditing(!isEditing)} variant="outline" disabled={isProcessing}>
                   {isEditing ? 'Cancelar' : <><Edit className="w-4 h-4 mr-2" /> Editar Equipo</>}
                 </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={isProcessing}>
-                      <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará permanentemente el equipo
-                        y todos los datos asociados, incluidos los reportes de control de calidad.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteEquipment}>
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                {canDeleteEquipment && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={isProcessing}>
+                        <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción no se puede deshacer. Esto eliminará permanentemente el equipo
+                          y todos los datos asociados, incluidos los reportes de control de calidad.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteEquipment}>
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
             )}
           </div>
@@ -493,7 +497,7 @@ const EquipmentDetailPage = () => {
             </div>
           </>
         )}
-      </div>
+      </div >
       {editingReport && (
         <EditQCReportModal
           report={editingReport}
@@ -501,7 +505,8 @@ const EquipmentDetailPage = () => {
           onClose={() => setEditingReport(null)}
           qcParams={getQcParamsForReport(editingReport)}
         />
-      )}
+      )
+      }
     </>
   );
 };

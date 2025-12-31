@@ -1,7 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { LayoutDashboard, Microscope, Settings, LogOut, BarChart3, Activity, Upload } from 'lucide-react';
+import { LayoutDashboard, Microscope, Settings, LogOut, BarChart3, Activity, Upload, User, Building2, BadgeCheck } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import LabSelector from '@/components/LabSelector';
@@ -9,15 +17,14 @@ import LabSelector from '@/components/LabSelector';
 const SidebarLink = ({ to, icon: Icon, children }) => {
   const location = useLocation();
   const isActive = location.pathname.startsWith(to);
-  
+
   return (
     <Link
       to={to}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-        isActive 
-          ? 'bg-primary/10 text-primary font-medium' 
+      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+          ? 'bg-primary/10 text-primary font-medium'
           : 'text-gray-600 hover:bg-gray-100'
-      }`}
+        }`}
     >
       <Icon className="w-5 h-5" />
       <span>{children}</span>
@@ -39,7 +46,7 @@ const Layout = ({ children }) => {
             <span>DIMMA QC</span>
           </div>
         </div>
-        
+
         <nav className="p-4 space-y-1">
           <SidebarLink to="/" icon={LayoutDashboard}>Tablero</SidebarLink>
           <SidebarLink to="/equipment" icon={Microscope}>Equipos</SidebarLink>
@@ -51,20 +58,42 @@ const Layout = ({ children }) => {
         </nav>
 
         <div className="absolute bottom-0 w-full p-4 border-t bg-white">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <Avatar>
-              <AvatarImage src={user?.user_metadata?.avatar_url} />
-              <AvatarFallback>{user?.email?.substring(0,2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.user_metadata?.full_name || 'Usuario'}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full justify-start" onClick={signOut}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Cerrar Sesión
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-100 transition-colors text-left focus:outline-none">
+                <Avatar>
+                  <AvatarImage src={user?.profile?.avatar_url} />
+                  <AvatarFallback>{user?.email?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.profile?.full_name || user?.user_metadata?.full_name || 'Usuario'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user?.profile?.full_name}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <BadgeCheck className="mr-2 h-4 w-4" />
+                <span>Role: <span className="font-semibold capitalize">{user?.profile?.role || 'Technician'}</span></span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Building2 className="mr-2 h-4 w-4" />
+                <span>Lab: <span className="font-semibold">{user?.profile?.laboratory?.name || 'N/A'}</span></span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Cerrar Sesión</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
 
@@ -74,9 +103,9 @@ const Layout = ({ children }) => {
           <div className="flex items-center gap-4">
             <LabSelector />
           </div>
-          
+
           <div className="flex items-center gap-4">
-             {/* Mobile Menu Trigger could go here */}
+            {/* Mobile Menu Trigger could go here */}
           </div>
         </header>
 

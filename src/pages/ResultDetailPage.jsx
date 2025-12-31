@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { hasPermission } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Printer, Save, MessageSquare, Edit, CheckSquare, ShieldCheck, Send } from 'lucide-react';
@@ -14,7 +15,7 @@ const ResultDetailPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [result, setResult] = useState(null);
   const [patient, setPatient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -41,17 +42,17 @@ const ResultDetailPage = () => {
       }
     }));
   };
-  
+
   const handleSaveChanges = () => {
     updateResult(result.id, { data: editableData });
     setIsEditing(false);
     toast({ title: "Cambios guardados", description: "El informe ha sido actualizado." });
   };
-  
+
   const handlePrint = () => window.print();
 
   const handleAddComment = () => {
-     toast({
+    toast({
       title: "🚧 Agregar Comentario",
       description: "Función en desarrollo. ¡Disponible próximamente!",
     });
@@ -62,7 +63,7 @@ const ResultDetailPage = () => {
     setResult(prev => ({ ...prev, status: 'completed' }));
     toast({ title: "Resultado Completado", description: "El informe está listo para la revisión técnica." });
   };
-  
+
   const handleReview = () => {
     updateResult(result.id, { status: 'revisado', reviewedBy: user?.email || 'Unknown' });
     setResult(prev => ({ ...prev, status: 'revisado', reviewedBy: user?.email }));
@@ -74,23 +75,23 @@ const ResultDetailPage = () => {
     setResult(prev => ({ ...prev, status: 'validated', validatedBy: user?.email }));
     toast({ title: "Resultado Validado", description: "El informe ha sido validado exitosamente." });
   };
-  
+
   const canEdit = user && !['revisado', 'validated'].includes(result?.status);
   const canComplete = user && result?.status === 'processing';
   const canReview = user && result?.status === 'completed';
-  const canValidate = user && result?.status === 'revisado';
+  const canValidate = user && result?.status === 'revisado' && hasPermission(user, 'validate_results');
 
   if (!result || !patient) {
     return <div>Cargando...</div>;
   }
-  
+
   const renderParameter = (param, data) => (
     <tr key={param} className="border-b border-gray-200 hover:bg-gray-50">
       <td className="py-2 px-4 font-medium text-gray-700">{param}</td>
       {isEditing ? (
         <td className="py-2 px-4">
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={data.value}
             onChange={(e) => handleDataChange(param, 'value', e.target.value)}
             className="w-full px-2 py-1 border rounded-md"
@@ -109,7 +110,7 @@ const ResultDetailPage = () => {
       <Helmet>
         <title>Informe de {result.testType} para {patient.name} - LabClínico Pro</title>
       </Helmet>
-      
+
       <div className="max-w-4xl mx-auto">
         <div className="bg-white p-8 rounded-lg shadow-lg print-container" id="informe-imprimible">
           <header className="flex justify-between items-start pb-6 border-b-2 border-blue-600">
@@ -147,21 +148,21 @@ const ResultDetailPage = () => {
             </motion.div>
 
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="font-semibold text-gray-700">Revisado por (Técnico):</p>
-                    <p className="text-gray-600">{result.reviewedBy || 'Pendiente'}</p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="font-semibold text-gray-700">Validado por:</p>
-                    <p className="text-gray-600">{result.validatedBy || 'Pendiente'}</p>
-                </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="font-semibold text-gray-700">Revisado por (Técnico):</p>
+                <p className="text-gray-600">{result.reviewedBy || 'Pendiente'}</p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="font-semibold text-gray-700">Validado por:</p>
+                <p className="text-gray-600">{result.validatedBy || 'Pendiente'}</p>
+              </div>
             </div>
 
             {result.notes && (
-                <div className="mt-6 bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
-                    <h4 className="font-semibold text-yellow-800">Notas:</h4>
-                    <p className="text-yellow-700">{result.notes}</p>
-                </div>
+              <div className="mt-6 bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                <h4 className="font-semibold text-yellow-800">Notas:</h4>
+                <p className="text-yellow-700">{result.notes}</p>
+              </div>
             )}
           </main>
 

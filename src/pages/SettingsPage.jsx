@@ -5,7 +5,6 @@ import GeneralSettingsTab from '@/components/settings/GeneralSettingsTab';
 import SecuritySettingsTab from '@/components/settings/SecuritySettingsTab';
 import LaboratoriesPage from '@/pages/LaboratoriesPage';
 import ParametrosPorEquipoPage from '@/pages/ParametrosPorEquipoPage';
-import UsersManagementPage from '@/pages/UsersManagementPage';
 import UserManagementPage from '@/pages/UserManagementPage'; // New component
 import QCSettingsPage from '@/pages/QCSettingsPage';
 import { Sliders as FileSliders, Users, Shield, Settings, Building2, CircuitBoard, UserCog } from 'lucide-react';
@@ -18,8 +17,7 @@ const SettingsPage = () => {
     const tabsConfig = [
         { value: 'labs', icon: Building2, label: 'Laboratorios', component: <LaboratoriesPage />, adminOnly: true },
         { value: 'params-equip', icon: CircuitBoard, label: 'Parámetros por Equipo', component: <ParametrosPorEquipoPage />, adminOnly: true },
-        { value: 'users-mgmt', icon: Users, label: 'Usuarios (Legacy)', component: <UsersManagementPage />, adminOnly: true },
-        { value: 'users-admin', icon: UserCog, label: 'Gestión Usuarios', component: <UserManagementPage />, adminOnly: true }, // New Tab
+        { value: 'users-admin', icon: UserCog, label: 'Usuarios', component: <UserManagementPage />, adminOnly: true }, // New Tab
         { value: 'equipos-lotes', icon: FileSliders, label: 'Config. Equipos', component: <QCSettingsPage isTab={true} />, adminOnly: false },
         { value: 'general', icon: Settings, label: 'General', component: <GeneralSettingsTab />, adminOnly: false },
         { value: 'security', icon: Shield, label: 'Seguridad', component: <SecuritySettingsTab />, adminOnly: true },
@@ -38,13 +36,13 @@ const SettingsPage = () => {
                     <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
                     <p className="text-muted-foreground">Gestione laboratorios, tipos de equipos y acceso de usuarios.</p>
                 </div>
-                
-                <Tabs defaultValue={availableTabs[0].value} className="flex flex-col md:flex-row gap-6">
-                    <TabsList className="flex flex-col h-auto bg-transparent p-0 w-full md:w-1/5">
+
+                <Tabs defaultValue={availableTabs[0].value} className="flex flex-col md:flex-row gap-6 items-start">
+                    <TabsList className="flex flex-col h-auto bg-transparent p-0 w-full md:w-1/5 shrink-0">
                         {availableTabs.map(tab => (
-                             <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-3">
-                                <tab.icon className="w-5 h-5 mr-3"/> {tab.label}
-                             </TabsTrigger>
+                            <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-3">
+                                <tab.icon className="w-5 h-5 mr-3" /> {tab.label}
+                            </TabsTrigger>
                         ))}
                     </TabsList>
                     <div className="flex-1">
