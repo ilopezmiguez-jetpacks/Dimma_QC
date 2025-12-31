@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useQCData } from '@/contexts/QCDataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { supabase } from '@/lib/customSupabaseClient'; // Included import
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -82,13 +83,16 @@ const StatsTable = ({ reports, qcParams }) => {
 
 const EquipmentDetailPage = () => {
   const { equipmentId } = useParams();
-  const { equipment, qcReports, addQCReport, updateEquipmentDetails, deleteEquipment, loading: contextLoading } = useQCData();
+  const { equipment, addQCReport, updateEquipmentDetails, deleteEquipment, loading: contextLoading } = useQCData();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const currentEquipment = useMemo(() => equipment.find(e => e.id === equipmentId), [equipment, equipmentId]);
   const activeLot = useMemo(() => currentEquipment?.lots?.find(l => l.isActive), [currentEquipment]);
+
+  const [reports, setReports] = useState([]); // Local state for reports
+  const [loadingReports, setLoadingReports] = useState(true);
 
   const [selectedLevel, setSelectedLevel] = useState('');
   const [selectedParam, setSelectedParam] = useState('');
@@ -98,6 +102,39 @@ const EquipmentDetailPage = () => {
   const [editingReport, setEditingReport] = useState(null);
   const [dailyDeviationThreshold, setDailyDeviationThreshold] = useState(2);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fetch Reports Effect
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!equipmentId) return;
+      setLoadingReports(true);
+      try {
+        const { data, error } = await supabase
+          .from('qc_reports')
+          .select('*')
+          .eq('equipment_id', equipmentId)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        const formattedReports = (data || []).map(r => ({
+          ...r,
+          equipmentId: r.equipment_id,
+          lotNumber: r.lot_number,
+          westgardRules: r.westgard_rules
+        }));
+        setReports(formattedReports);
+      } catch (err) {
+        console.error("Error fetching local reports:", err);
+        toast({ title: 'Error', description: 'No se pudieron cargar los reportes.', variant: 'destructive' });
+      } finally {
+        setLoadingReports(false);
+      }
+    };
+
+    fetchReports();
+  }, [equipmentId, toast]);
 
   useEffect(() => {
     if (activeLot && activeLot.qc_params) {
@@ -110,8 +147,8 @@ const EquipmentDetailPage = () => {
         setSelectedParam('');
       }
     } else {
-        setSelectedLevel('');
-        setSelectedParam('');
+      setSelectedLevel('');
+      setSelectedParam('');
     }
     if (currentEquipment) {
       setEditableEquipment(JSON.parse(JSON.stringify(currentEquipment)));
@@ -132,13 +169,13 @@ const EquipmentDetailPage = () => {
   if (!currentEquipment) {
     return <div className="text-center p-10">Equipo no encontrado. Es posible que haya sido eliminado.</div>;
   }
-  
-  const equipmentReports = qcReports
-    .filter(r => 
-        r.equipmentId === equipmentId && 
-        activeLot && r.lotNumber === activeLot.lotNumber && 
-        new Date(r.date) <= new Date(activeLot.expirationDate) &&
-        r.level === selectedLevel
+
+  const equipmentReports = reports
+    .filter(r =>
+      r.equipmentId === equipmentId &&
+      activeLot && r.lotNumber === activeLot.lotNumber &&
+      new Date(r.date) <= new Date(activeLot.expirationDate) &&
+      r.level === selectedLevel
     )
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -148,7 +185,7 @@ const EquipmentDetailPage = () => {
       const firstParam = Object.keys(activeLot.qc_params[level])[0];
       setSelectedParam(firstParam || '');
     } else {
-        setSelectedParam('');
+      setSelectedParam('');
     }
     setInputValues({});
   };
@@ -169,49 +206,50 @@ const EquipmentDetailPage = () => {
       values: Object.fromEntries(Object.entries(inputValues).map(([k, v]) => [k, parseFloat(v)])),
       dailyDeviationThreshold: dailyDeviationThreshold,
     };
-    
+
     try {
-        const newReport = await addQCReport(report);
-        if (newReport) {
-            toast({
-                title: "Reporte QC Guardado",
-                description: `El control para ${currentEquipment.name} ha sido registrado.`,
-                variant: newReport.status === 'error' ? 'destructive' : 'default',
-            });
-            setInputValues({});
-        }
+      const newReport = await addQCReport(report);
+      if (newReport) {
+        toast({
+          title: "Reporte QC Guardado",
+          description: `El control para ${currentEquipment.name} ha sido registrado.`,
+          variant: newReport.status === 'error' ? 'destructive' : 'default',
+        });
+        setInputValues({});
+        setReports(prev => [newReport, ...prev]); // Update local state
+      }
     } catch (err) {
-        console.error("Error saving report:", err);
-        toast({ title: 'Error', description: 'Error al guardar reporte.', variant: 'destructive' });
+      console.error("Error saving report:", err);
+      toast({ title: 'Error', description: 'Error al guardar reporte.', variant: 'destructive' });
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   };
 
   const handleSaveDetails = async () => {
     setIsProcessing(true);
     try {
-        await updateEquipmentDetails(equipmentId, editableEquipment);
-        setIsEditing(false);
-        toast({ title: "Detalles Guardados", description: "La información del equipo ha sido actualizada." });
+      await updateEquipmentDetails(equipmentId, editableEquipment);
+      setIsEditing(false);
+      toast({ title: "Detalles Guardados", description: "La información del equipo ha sido actualizada." });
     } catch (err) {
-        console.error("Error updating details:", err);
-        toast({ title: 'Error', description: 'Error al actualizar detalles.', variant: 'destructive' });
+      console.error("Error updating details:", err);
+      toast({ title: 'Error', description: 'Error al actualizar detalles.', variant: 'destructive' });
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   };
-  
+
   const handleDeleteEquipment = async () => {
     setIsProcessing(true);
     try {
-        await deleteEquipment(equipmentId);
-        toast({ title: "Equipo Eliminado", description: `${currentEquipment.name} ha sido eliminado.` });
-        navigate('/equipment');
+      await deleteEquipment(equipmentId);
+      toast({ title: "Equipo Eliminado", description: `${currentEquipment.name} ha sido eliminado.` });
+      navigate('/equipment');
     } catch (err) {
-        console.error("Error deleting equipment:", err);
-        toast({ title: 'Error', description: 'Error al eliminar el equipo.', variant: 'destructive' });
-        setIsProcessing(false);
+      console.error("Error deleting equipment:", err);
+      toast({ title: 'Error', description: 'Error al eliminar el equipo.', variant: 'destructive' });
+      setIsProcessing(false);
     }
   };
 
@@ -269,7 +307,7 @@ const EquipmentDetailPage = () => {
                 <Button onClick={() => setIsEditing(!isEditing)} variant="outline" disabled={isProcessing}>
                   {isEditing ? 'Cancelar' : <><Edit className="w-4 h-4 mr-2" /> Editar Equipo</>}
                 </Button>
-                 <AlertDialog>
+                <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" disabled={isProcessing}>
                       <Trash2 className="w-4 h-4 mr-2" /> Eliminar
@@ -297,9 +335,9 @@ const EquipmentDetailPage = () => {
           {isEditing && editableEquipment && (
             <div className="mt-4 pt-4 border-t border-border">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input type="text" placeholder="Nombre del Equipo" value={editableEquipment.name} onChange={e => setEditableEquipment({...editableEquipment, name: e.target.value})} className="p-2 border rounded" disabled={isProcessing} />
-                <input type="text" placeholder="Modelo" value={editableEquipment.model} onChange={e => setEditableEquipment({...editableEquipment, model: e.target.value})} className="p-2 border rounded" disabled={isProcessing} />
-                <input type="text" placeholder="Número de Serie" value={editableEquipment.serial} onChange={e => setEditableEquipment({...editableEquipment, serial: e.target.value})} className="p-2 border rounded" disabled={isProcessing} />
+                <input type="text" placeholder="Nombre del Equipo" value={editableEquipment.name} onChange={e => setEditableEquipment({ ...editableEquipment, name: e.target.value })} className="p-2 border rounded" disabled={isProcessing} />
+                <input type="text" placeholder="Modelo" value={editableEquipment.model} onChange={e => setEditableEquipment({ ...editableEquipment, model: e.target.value })} className="p-2 border rounded" disabled={isProcessing} />
+                <input type="text" placeholder="Número de Serie" value={editableEquipment.serial} onChange={e => setEditableEquipment({ ...editableEquipment, serial: e.target.value })} className="p-2 border rounded" disabled={isProcessing} />
               </div>
               <Button onClick={handleSaveDetails} className="mt-4 medical-gradient text-white" disabled={isProcessing}>
                 {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
@@ -327,40 +365,40 @@ const EquipmentDetailPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 medical-card rounded-xl p-6">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-                    <h2 className="text-xl font-bold text-foreground">Gráfico Levey-Jennings</h2>
-                    <div className="flex gap-2 mt-2 sm:mt-0">
-                        <select value={selectedLevel} onChange={(e) => handleLevelChange(e.target.value)} className="p-2 border border-border rounded-md text-sm">
-                            <option value="" disabled>Nivel</option>
-                            {activeLot.qc_params && Object.keys(activeLot.qc_params).map(level => <option key={level} value={level}>{level}</option>)}
-                        </select>
-                        <select value={selectedParam} onChange={(e) => setSelectedParam(e.target.value)} className="p-2 border border-border rounded-md text-sm" disabled={!selectedLevel}>
-                            <option value="" disabled>Parámetro</option>
-                            {selectedLevel && activeLot.qc_params[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).map(param => <option key={param} value={param}>{param}</option>)}
-                        </select>
-                    </div>
+                  <h2 className="text-xl font-bold text-foreground">Gráfico Levey-Jennings</h2>
+                  <div className="flex gap-2 mt-2 sm:mt-0">
+                    <select value={selectedLevel} onChange={(e) => handleLevelChange(e.target.value)} className="p-2 border border-border rounded-md text-sm">
+                      <option value="" disabled>Nivel</option>
+                      {activeLot.qc_params && Object.keys(activeLot.qc_params).map(level => <option key={level} value={level}>{level}</option>)}
+                    </select>
+                    <select value={selectedParam} onChange={(e) => setSelectedParam(e.target.value)} className="p-2 border border-border rounded-md text-sm" disabled={!selectedLevel}>
+                      <option value="" disabled>Parámetro</option>
+                      {selectedLevel && activeLot.qc_params[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).map(param => <option key={param} value={param}>{param}</option>)}
+                    </select>
+                  </div>
                 </div>
                 {selectedParam ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={yAxisLabel} />
-                        <Tooltip />
-                        <Legend />
-                        {qcParamsForChart && (
-                            <>
-                                <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Media" stroke="black" strokeDasharray="3 3" />
-                                <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 2 * parseFloat(qcParamsForChart.sd)} label="+2s" stroke="orange" strokeDasharray="3 3" />
-                                <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 2 * parseFloat(qcParamsForChart.sd)} label="-2s" stroke="orange" strokeDasharray="3 3" />
-                                <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 3 * parseFloat(qcParamsForChart.sd)} label="+3s" stroke="red" strokeDasharray="3 3" />
-                                <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 3 * parseFloat(qcParamsForChart.sd)} label="-3s" stroke="red" strokeDasharray="3 3" />
-                            </>
-                        )}
-                        <Line type="monotone" dataKey="value" name={selectedParam} stroke="hsl(var(--primary))" strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={yAxisLabel} />
+                      <Tooltip />
+                      <Legend />
+                      {qcParamsForChart && (
+                        <>
+                          <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Media" stroke="black" strokeDasharray="3 3" />
+                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 2 * parseFloat(qcParamsForChart.sd)} label="+2s" stroke="orange" strokeDasharray="3 3" />
+                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 2 * parseFloat(qcParamsForChart.sd)} label="-2s" stroke="orange" strokeDasharray="3 3" />
+                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 3 * parseFloat(qcParamsForChart.sd)} label="+3s" stroke="red" strokeDasharray="3 3" />
+                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 3 * parseFloat(qcParamsForChart.sd)} label="-3s" stroke="red" strokeDasharray="3 3" />
+                        </>
+                      )}
+                      <Line type="monotone" dataKey="value" name={selectedParam} stroke="hsl(var(--primary))" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 ) : (
-                    <div className="flex items-center justify-center h-[300px] text-muted-foreground">Seleccione un parámetro para ver el gráfico.</div>
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">Seleccione un parámetro para ver el gráfico.</div>
                 )}
               </div>
 
@@ -377,7 +415,7 @@ const EquipmentDetailPage = () => {
                   </div>
                   {selectedLevel && activeLot.qc_params[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel]).length > 0 ? (
                     <div className="space-y-3 pt-2">
-                      {Object.entries(activeLot.qc_params[selectedLevel]).map(([param, {mean, sd, unit}]) => {
+                      {Object.entries(activeLot.qc_params[selectedLevel]).map(([param, { mean, sd, unit }]) => {
                         const numMean = parseFloat(mean);
                         const numSd = parseFloat(sd);
                         return (
@@ -392,17 +430,17 @@ const EquipmentDetailPage = () => {
                       })}
                     </div>
                   ) : selectedLevel && (
-                     <div className="text-center text-muted-foreground py-4">No hay parámetros definidos para este nivel.</div>
+                    <div className="text-center text-muted-foreground py-4">No hay parámetros definidos para este nivel.</div>
                   )}
-                   <div>
-                        <label className="block text-sm font-medium text-gray-700">Umbral de Alerta Diaria (SD)</label>
-                        <select value={dailyDeviationThreshold} onChange={(e) => setDailyDeviationThreshold(parseFloat(e.target.value))} className="mt-1 p-2 border border-border rounded-md w-full" disabled={isProcessing}>
-                            <option value={1}>1</option>
-                            <option value={1.5}>1.5</option>
-                            <option value={2}>2</option>
-                            <option value={2.5}>2.5</option>
-                        </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Umbral de Alerta Diaria (SD)</label>
+                    <select value={dailyDeviationThreshold} onChange={(e) => setDailyDeviationThreshold(parseFloat(e.target.value))} className="mt-1 p-2 border border-border rounded-md w-full" disabled={isProcessing}>
+                      <option value={1}>1</option>
+                      <option value={1.5}>1.5</option>
+                      <option value={2}>2</option>
+                      <option value={2.5}>2.5</option>
+                    </select>
+                  </div>
                   <Button type="submit" disabled={!canSubmit || isProcessing} className="w-full medical-gradient text-white">
                     {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                     Guardar Control
@@ -410,43 +448,48 @@ const EquipmentDetailPage = () => {
                 </form>
               </div>
             </div>
-            
+
             {selectedLevel && activeLot.qc_params[selectedLevel] && <StatsTable reports={equipmentReports} qcParams={activeLot.qc_params[selectedLevel]} />}
 
             <div className="medical-card rounded-xl p-6">
-                <h2 className="text-xl font-bold text-foreground mb-4">Historial de Controles (Lote Actual)</h2>
+              <h2 className="text-xl font-bold text-foreground mb-4">Historial de Controles (Lote Actual)</h2>
+              {loadingReports ? <p>Cargando reportes...</p> : (
                 <div className="max-h-60 overflow-y-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-secondary text-muted-foreground uppercase sticky top-0">
-                            <tr>
-                                <th className="py-2 px-4">Fecha</th>
-                                <th className="py-2 px-4">Técnico</th>
-                                <th className="py-2 px-4">Nivel</th>
-                                <th className="py-2 px-4">Estado</th>
-                                <th className="py-2 px-4">Reglas Westgard</th>
-                                {isAdmin && <th className="py-2 px-4">Acciones</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {qcReports.filter(r => r.equipmentId === equipmentId && r.lotNumber === activeLot.lotNumber).sort((a, b) => new Date(b.date) - new Date(a.date)).map(report => (
-                                <tr key={report.id} className="border-b border-border hover:bg-secondary/50">
-                                    <td className="py-2 px-4">{new Date(report.date).toLocaleString()}</td>
-                                    <td className="py-2 px-4">{report.technician}</td>
-                                    <td className="py-2 px-4">{report.level}</td>
-                                    <td className={`py-2 px-4 font-semibold ${getStatusInfo(report.status).color}`}>{report.status.toUpperCase()}</td>
-                                    <td className="py-2 px-4 text-red-600">{(report.westgardRules || []).join(', ')}</td>
-                                    {isAdmin && (
-                                        <td className="py-2 px-4">
-                                            <Button variant="ghost" size="icon" onClick={() => setEditingReport(report)}>
-                                                <Pencil className="w-4 h-4" />
-                                            </Button>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-secondary text-muted-foreground uppercase sticky top-0">
+                      <tr>
+                        <th className="py-2 px-4">Fecha</th>
+                        <th className="py-2 px-4">Técnico</th>
+                        <th className="py-2 px-4">Nivel</th>
+                        <th className="py-2 px-4">Estado</th>
+                        <th className="py-2 px-4">Reglas Westgard</th>
+                        {isAdmin && <th className="py-2 px-4">Acciones</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reports
+                        .filter(r => r.equipmentId === equipmentId && r.lotNumber === activeLot.lotNumber)
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .map(report => (
+                          <tr key={report.id} className="border-b border-border hover:bg-secondary/50">
+                            <td className="py-2 px-4">{new Date(report.date).toLocaleString()}</td>
+                            <td className="py-2 px-4">{report.technician}</td>
+                            <td className="py-2 px-4">{report.level}</td>
+                            <td className={`py-2 px-4 font-semibold ${getStatusInfo(report.status).color}`}>{report.status.toUpperCase()}</td>
+                            <td className="py-2 px-4 text-red-600">{(report.westgardRules || []).join(', ')}</td>
+                            {isAdmin && (
+                              <td className="py-2 px-4">
+                                <Button variant="ghost" size="icon" onClick={() => setEditingReport(report)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
                 </div>
+              )}
             </div>
           </>
         )}
