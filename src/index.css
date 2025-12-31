@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --background: 210 40% 98%;
+  --foreground: 210 10% 23%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 10% 23%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 10% 23%;
+  --primary: 175 80% 35%;
+  --primary-foreground: 175 20% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 210 80% 35%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 210 5% 45%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 210 80% 35%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 210 40% 90%;
+  --input: 210 40% 90%;
+  --ring: 175 80% 40%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+/* Google Translate Widget Override */
+body > .skiptranslate,
+#goog-gt-tt,
+.VIpgJd-yAWNEb-L7lbkb,
+.goog-te-banner-frame,
+.goog-te-balloon-frame {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+body {
+  top: 0 !important;
+}
+
+.medical-gradient {
+  background: linear-gradient(135deg, hsl(175, 70%, 40%) 0%, hsl(180, 80%, 30%) 100%);
+}
+
+.sidebar-gradient {
+    background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+}
+
+.medical-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.medical-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
+  transform: translateY(-2px);
+}
