@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
-import { 
-  Search, 
-  FileText, 
+import {
+  Search,
+  FileText,
   Check,
   Users,
   History,
@@ -39,12 +39,12 @@ const ResultsPage = () => {
     const patient = patients.find(p => p.id === result.patientId);
     if (!patient) return false;
     const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         patient.dni.includes(searchTerm) ||
-                         result.testType?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      patient.dni.includes(searchTerm) ||
+      result.testType?.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = statusFilter === 'all' || result.status === statusFilter;
     const matchesDate = !dateFilter || result.createdAt.startsWith(dateFilter);
-    
+
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -60,7 +60,7 @@ const ResultsPage = () => {
   };
 
   const handleValidateResult = (resultId) => {
-    updateResult(resultId, { status: 'validated', validatedBy: user?.email || 'Unknown' });
+    updateResult(resultId, { status: 'validated', validatedBy: user?.profile?.full_name || user?.email || 'Desconocido' });
     toast({
       title: "Resultado Validado",
       description: "El resultado ha sido validado exitosamente.",
@@ -103,13 +103,13 @@ const ResultsPage = () => {
           </div>
           {result.possibleDiagnosis && (
             <div className="p-3 bg-indigo-50 border-l-4 border-indigo-400 rounded-r-lg">
-              <p className="text-sm font-medium text-indigo-800 flex items-center"><BrainCircuit className="w-4 h-4 mr-2"/>Posible Diagnóstico:</p>
+              <p className="text-sm font-medium text-indigo-800 flex items-center"><BrainCircuit className="w-4 h-4 mr-2" />Posible Diagnóstico:</p>
               <p className="text-sm text-indigo-700 font-semibold">{result.possibleDiagnosis}</p>
             </div>
           )}
           {patientHistory.length > 0 && (
             <div className="p-3 bg-gray-50 border-l-4 border-gray-300 rounded-r-lg">
-              <p className="text-sm font-medium text-gray-800 flex items-center"><History className="w-4 h-4 mr-2"/>Historial Reciente:</p>
+              <p className="text-sm font-medium text-gray-800 flex items-center"><History className="w-4 h-4 mr-2" />Historial Reciente:</p>
               <ul className="list-disc list-inside text-sm text-gray-600 mt-1">
                 {patientHistory.map(hist => <li key={hist.id}>{hist.testType} ({new Date(hist.createdAt).toLocaleDateString('es-AR')})</li>)}
               </ul>
@@ -117,8 +117,8 @@ const ResultsPage = () => {
           )}
           {result.notes && (
             <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
-                <p className="text-sm font-medium text-yellow-800">Nota:</p>
-                <p className="text-sm text-yellow-700">{result.notes}</p>
+              <p className="text-sm font-medium text-yellow-800">Nota:</p>
+              <p className="text-sm text-yellow-700">{result.notes}</p>
             </div>
           )}
         </div>
@@ -143,7 +143,7 @@ const ResultsPage = () => {
   return (
     <>
       <Helmet>
-        <title>Resultados - LabClínico Pro</title>
+        <title>Resultados - DIMMA QC</title>
         <meta name="description" content="Gestión de resultados de análisis clínicos." />
       </Helmet>
 

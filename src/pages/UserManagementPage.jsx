@@ -35,7 +35,8 @@ const UserManagementPage = () => {
     fullName: '',
     password: '',
     role: 'technician',
-    laboratoryId: ''
+    laboratoryId: '',
+    fullName: ''
   });
 
   const { user: currentUser, session } = useAuth();
@@ -79,7 +80,7 @@ const UserManagementPage = () => {
         laboratoryId: p.laboratory_id,
         user_metadata: {
           full_name: p.full_name,
-          role: p.role
+          role: p.role || 'technician'
         },
         email_confirmed_at: p.created_at
       }));
@@ -250,7 +251,7 @@ const UserManagementPage = () => {
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.user_metadata?.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
-                    {u.user_metadata?.role || 'user'}
+                    {u.user_metadata?.role === 'admin' ? 'Administrador' : u.user_metadata?.role === 'biochemist' ? 'Bioquímico' : 'Técnico'}
                   </Badge>
                 </TableCell>
                 <TableCell>

@@ -14,8 +14,8 @@ const LabSelector = () => {
   const { laboratories, currentLabId, setCurrentLabId, loading } = useQCData();
   const { user } = useAuth();
 
-  // Only admins/superadmins can switch labs
-  const canSwitch = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+  // Only admins can switch labs
+  const canSwitch = user?.user_metadata?.role === 'admin';
 
   if (!canSwitch || loading) return null;
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import GeneralSettingsTab from '@/components/settings/GeneralSettingsTab';
@@ -12,7 +13,8 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 
 const SettingsPage = () => {
     const { user } = useAuth();
-    const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+    const [searchParams] = useSearchParams();
+    const isAdmin = user?.user_metadata?.role === 'admin';
 
     const tabsConfig = [
         { value: 'labs', icon: Building2, label: 'Laboratorios', component: <LaboratoriesPage />, adminOnly: true },
@@ -24,6 +26,7 @@ const SettingsPage = () => {
     ];
 
     const availableTabs = tabsConfig.filter(tab => !tab.adminOnly || isAdmin);
+    const defaultTab = searchParams.get('tab') || availableTabs[0]?.value;
 
     return (
         <>
@@ -37,7 +40,7 @@ const SettingsPage = () => {
                     <p className="text-muted-foreground">Gestione laboratorios, tipos de equipos y acceso de usuarios.</p>
                 </div>
 
-                <Tabs defaultValue={availableTabs[0].value} className="flex flex-col md:flex-row gap-6 items-start">
+                <Tabs defaultValue={defaultTab} className="flex flex-col md:flex-row gap-6 items-start">
                     <TabsList className="flex flex-col h-auto bg-transparent p-0 w-full md:w-1/5 shrink-0">
                         {availableTabs.map(tab => (
                             <TabsTrigger key={tab.value} value={tab.value} className="w-full justify-start data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 py-3">

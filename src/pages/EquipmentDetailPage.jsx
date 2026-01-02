@@ -275,7 +275,7 @@ const EquipmentDetailPage = () => {
   const canSubmit = selectedLevel && activeLot?.qc_params?.[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).length > 0 && Object.keys(activeLot.qc_params[selectedLevel]).every(param => inputValues[param]);
   const yAxisLabel = qcParamsForChart?.unit ? { value: qcParamsForChart.unit, angle: -90, position: 'insideLeft', offset: 10 } : null;
   const canDeleteEquipment = hasPermission(user, 'delete_equipment');
-  const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+  const isAdmin = user?.user_metadata?.role === 'admin';
 
   return (
     <>

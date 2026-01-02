@@ -32,14 +32,14 @@ const EquipmentPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
+
   // Edit State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [equipmentTypes, setEquipmentTypes] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+  const isAdmin = user?.user_metadata?.role === 'admin';
 
   const params = new URLSearchParams(window.location.search);
   const initialStatus = params.get('status');
@@ -68,15 +68,15 @@ const EquipmentPage = () => {
 
   const filteredEquipment = equipment.filter(eq => {
     const matchesSearch = eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         eq.model.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      eq.model.toLowerCase().includes(searchTerm.toLowerCase());
+
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'issue') return matchesSearch && (eq.status === 'warning' || eq.status === 'error');
     if (statusFilter === 'maintenance') {
-        const maintenanceDate = new Date(eq.maintenanceDue);
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        return matchesSearch && maintenanceDate < today;
+      const maintenanceDate = new Date(eq.maintenanceDue);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return matchesSearch && maintenanceDate < today;
     }
     return matchesSearch && eq.status === statusFilter;
   });
@@ -91,7 +91,7 @@ const EquipmentPage = () => {
   };
 
   const handleAddEquipment = () => {
-    navigate('/settings');
+    navigate('/settings?tab=equipos-lotes');
   };
 
   const handleEditClick = (e, eq) => {
@@ -113,20 +113,21 @@ const EquipmentPage = () => {
     try {
       // Get type name for text field consistency
       const selectedType = equipmentTypes.find(t => t.id === editingEquipment.equipment_type_id);
-      
+
       const updates = {
         name: editingEquipment.name,
         model: editingEquipment.model,
         serial: editingEquipment.serial,
-        equipment_type_id: editingEquipment.equipment_type_id,
+        // Use || null to ensure empty strings become null, which is valid for UUID columns
+        equipment_type_id: editingEquipment.equipment_type_id || null,
         equipment_type: selectedType ? selectedType.name : undefined,
-        laboratory_id: editingEquipment.laboratory_id
+        laboratory_id: editingEquipment.laboratory_id || null
       };
 
       if (updateEquipmentDetails) {
         await updateEquipmentDetails(editingEquipment.id, updates);
       } else {
-         const { error } = await supabase
+        const { error } = await supabase
           .from('equipment')
           .update(updates)
           .eq('id', editingEquipment.id);
@@ -134,7 +135,7 @@ const EquipmentPage = () => {
         // Force reload if we updated directly bypassing context
         window.location.reload();
       }
-      
+
       toast({
         title: "Equipo actualizado",
         description: "Los datos del equipo han sido modificados correctamente.",
@@ -153,8 +154,8 @@ const EquipmentPage = () => {
     }
   };
 
-  const currentLabName = currentLabId === 'all' 
-    ? 'Todos los laboratorios' 
+  const currentLabName = currentLabId === 'all'
+    ? 'Todos los laboratorios'
     : laboratories.find(l => l.id === currentLabId)?.name || 'Laboratorio';
 
   const EquipmentCard = ({ eq }) => {
@@ -162,7 +163,7 @@ const EquipmentPage = () => {
     const Icon = statusInfo.icon;
     const maintenanceDate = new Date(eq.maintenanceDue);
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     const maintenanceDue = maintenanceDate < today;
 
     return (
@@ -170,45 +171,45 @@ const EquipmentPage = () => {
         className="equipment-card medical-card rounded-xl p-6 flex flex-col justify-between hover:shadow-lg transition-all duration-300"
       >
         <div>
-            <div 
-                className="flex items-start justify-between mb-4 cursor-pointer group"
-                onClick={() => navigate(`/equipment/${eq.id}`)}
-            >
+          <div
+            className="flex items-start justify-between mb-4 cursor-pointer group"
+            onClick={() => navigate(`/equipment/${eq.id}`)}
+          >
             <div>
-                <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{eq.name}</h3>
-                <p className="text-sm text-muted-foreground">{eq.model}</p>
+              <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{eq.name}</h3>
+              <p className="text-sm text-muted-foreground">{eq.model}</p>
             </div>
             <div className="flex flex-col items-end gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${statusInfo.bg} ${statusInfo.color}`}>
-                    <Icon className="w-4 h-4" />
-                    {statusInfo.text}
-                </span>
-                {isAdmin && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 w-6 p-0 hover:bg-gray-100" 
-                    onClick={(e) => handleEditClick(e, eq)}
-                  >
-                    <Pencil className="w-3 h-3 text-gray-500" />
-                  </Button>
-                )}
+              <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${statusInfo.bg} ${statusInfo.color}`}>
+                <Icon className="w-4 h-4" />
+                {statusInfo.text}
+              </span>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-100"
+                  onClick={(e) => handleEditClick(e, eq)}
+                >
+                  <Pencil className="w-3 h-3 text-gray-500" />
+                </Button>
+              )}
             </div>
-            </div>
-            <div className="space-y-2 text-sm text-muted-foreground">
+          </div>
+          <div className="space-y-2 text-sm text-muted-foreground">
             <p><strong>N/S:</strong> {eq.serial}</p>
             <div className={`flex items-center gap-2 p-2 rounded-md ${maintenanceDue ? 'bg-red-50 text-red-700' : 'bg-secondary'}`}>
-                <Wrench className="w-4 h-4" />
-                <span>Mantenimiento: {new Date(eq.maintenanceDue).toLocaleDateString('es-ES')}</span>
-                {maintenanceDue && <span className="font-bold">(VENCIDO)</span>}
+              <Wrench className="w-4 h-4" />
+              <span>Mantenimiento: {new Date(eq.maintenanceDue).toLocaleDateString('es-ES')}</span>
+              {maintenanceDue && <span className="font-bold">(VENCIDO)</span>}
             </div>
-            </div>
+          </div>
         </div>
         <div className="mt-4 pt-4 border-t border-border text-right">
-            <Button onClick={() => navigate(`/load-control?equipmentId=${eq.id}`)} className="w-full">
-                <Upload className="w-4 h-4 mr-2" />
-                Cargar Control
-            </Button>
+          <Button onClick={() => navigate(`/load-control?equipmentId=${eq.id}`)} className="w-full">
+            <Upload className="w-4 h-4 mr-2" />
+            Cargar Control
+          </Button>
         </div>
       </div>
     );
@@ -228,9 +229,9 @@ const EquipmentPage = () => {
             <p className="text-muted-foreground mt-1">Monitorea y gestiona los controles de calidad de {currentLabName}.</p>
           </div>
           {isAdmin && (
-             <Button onClick={handleAddEquipment} className="mt-4 sm:mt-0 medical-gradient text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Equipo
+            <Button onClick={handleAddEquipment} className="mt-4 sm:mt-0 medical-gradient text-white">
+              <Plus className="w-4 h-4 mr-2" />
+              Agregar Equipo
             </Button>
           )}
         </div>
@@ -248,10 +249,10 @@ const EquipmentPage = () => {
               />
             </div>
             <div className="flex items-center gap-2 p-1 bg-secondary rounded-lg">
-                <Button size="sm" variant={statusFilter === 'all' ? 'default' : 'ghost'} onClick={() => setStatusFilter('all')}>Todos</Button>
-                <Button size="sm" variant={statusFilter === 'ok' ? 'default' : 'ghost'} onClick={() => setStatusFilter('ok')}>OK</Button>
-                <Button size="sm" variant={statusFilter === 'issue' ? 'default' : 'ghost'} onClick={() => setStatusFilter('issue')}>Con Alertas</Button>
-                <Button size="sm" variant={statusFilter === 'maintenance' ? 'default' : 'ghost'} onClick={() => setStatusFilter('maintenance')}>Mantenimiento</Button>
+              <Button size="sm" variant={statusFilter === 'all' ? 'default' : 'ghost'} onClick={() => setStatusFilter('all')}>Todos</Button>
+              <Button size="sm" variant={statusFilter === 'ok' ? 'default' : 'ghost'} onClick={() => setStatusFilter('ok')}>OK</Button>
+              <Button size="sm" variant={statusFilter === 'issue' ? 'default' : 'ghost'} onClick={() => setStatusFilter('issue')}>Con Alertas</Button>
+              <Button size="sm" variant={statusFilter === 'maintenance' ? 'default' : 'ghost'} onClick={() => setStatusFilter('maintenance')}>Mantenimiento</Button>
             </div>
           </div>
         </div>
@@ -297,7 +298,7 @@ const EquipmentPage = () => {
                   className="col-span-3"
                 />
               </div>
-               <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="serial" className="text-right">Serie</Label>
                 <Input
                   id="serial"
@@ -308,9 +309,9 @@ const EquipmentPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="type" className="text-right">Tipo</Label>
-                <Select 
-                    value={editingEquipment.equipment_type_id} 
-                    onValueChange={(val) => setEditingEquipment({ ...editingEquipment, equipment_type_id: val })}
+                <Select
+                  value={editingEquipment.equipment_type_id}
+                  onValueChange={(val) => setEditingEquipment({ ...editingEquipment, equipment_type_id: val })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Seleccione tipo" />
@@ -326,9 +327,9 @@ const EquipmentPage = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="lab" className="text-right">Laboratorio</Label>
-                <Select 
-                    value={editingEquipment.laboratory_id} 
-                    onValueChange={(val) => setEditingEquipment({ ...editingEquipment, laboratory_id: val })}
+                <Select
+                  value={editingEquipment.laboratory_id}
+                  onValueChange={(val) => setEditingEquipment({ ...editingEquipment, laboratory_id: val })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Seleccione laboratorio" />

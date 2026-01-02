@@ -14,16 +14,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogHeader,
-    AlertDialogFooter,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const UsersSettingsTab = () => {
   const [users, setUsers] = useState([]);
@@ -34,11 +34,11 @@ const UsersSettingsTab = () => {
   const { session, user } = useAuth();
 
   const fetchUsers = useCallback(async () => {
-    if (user?.user_metadata?.role !== 'admin' && user?.user_metadata?.role !== 'superadmin') {
+    if (user?.user_metadata?.role !== 'admin') {
       setLoading(false);
       return;
     }
-  
+
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('get-users', {
@@ -46,13 +46,13 @@ const UsersSettingsTab = () => {
           'Authorization': `Bearer ${session.access_token}`
         }
       });
-  
+
       if (error) throw error;
-      
-      if(data.error){
-          throw new Error(data.error);
+
+      if (data.error) {
+        throw new Error(data.error);
       }
-  
+
       setUsers(data.users || []);
     } catch (error) {
       toast({
@@ -80,15 +80,15 @@ const UsersSettingsTab = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke('create-user', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: newUser,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: newUser,
       });
 
       if (error) throw error;
       if (data.error) throw new Error(data.error);
-      
+
       toast({ title: 'User Created', description: `User ${newUser.fullName} has been created. Authorization required.` });
       setNewUser({ fullName: '', email: '', password: '', role: 'technician' });
       setIsDialogOpen(false);
@@ -100,28 +100,27 @@ const UsersSettingsTab = () => {
 
   const handleAuthorizeUser = async (userId, email) => {
     try {
-        const { data, error } = await supabase.functions.invoke('authorize-user', {
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`
-            },
-            body: { userId },
-        });
+      const { data, error } = await supabase.functions.invoke('authorize-user', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: { userId },
+      });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-        toast({ title: "User Authorized", description: `User ${email} has been authorized.`});
-        fetchUsers();
+      toast({ title: "User Authorized", description: `User ${email} has been authorized.` });
+      fetchUsers();
 
-    } catch(error) {
-        toast({ variant: "destructive", title: "Authorization Error", description: error.message });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Authorization Error", description: error.message });
     }
   };
 
   const getRoleText = (role) => {
     switch (role) {
-      case 'admin': return 'Super User';
-      case 'superadmin': return 'Super User';
+      case 'admin': return 'Administrador';
       case 'technician': return 'Technician';
       case 'biochemist': return 'Biochemist';
       default: return 'User';
@@ -133,12 +132,12 @@ const UsersSettingsTab = () => {
     setNewUser(prev => ({ ...prev, [name]: value }));
   };
 
-  if (user?.user_metadata?.role !== 'admin' && user?.user_metadata?.role !== 'superadmin') {
+  if (user?.user_metadata?.role !== 'admin') {
     return (
-        <div>
-            <h2 className="text-2xl font-bold text-foreground">User Management</h2>
-            <p className="text-muted-foreground mt-4">You do not have permission to access this section.</p>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">User Management</h2>
+        <p className="text-muted-foreground mt-4">You do not have permission to access this section.</p>
+      </div>
     );
   }
 
@@ -147,39 +146,39 @@ const UsersSettingsTab = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-foreground">User Management</h2>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={fetchUsers} disabled={loading}>
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Button variant="outline" size="icon" onClick={fetchUsers} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-                <Button>
+              <Button>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Create User
-                </Button>
+              </Button>
             </DialogTrigger>
             <DialogContent>
-                <DialogHeader>
+              <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
-                    Fill in the details to add a new team member.
+                  Fill in the details to add a new team member.
                 </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
+              </DialogHeader>
+              <div className="space-y-4 py-4">
                 <input type="text" name="fullName" placeholder="Full Name" value={newUser.fullName} onChange={handleInputChange} className="w-full p-2 border rounded" />
                 <input type="email" name="email" placeholder="Email" value={newUser.email} onChange={handleInputChange} className="w-full p-2 border rounded" />
                 <input type="password" name="password" placeholder="Password" value={newUser.password} onChange={handleInputChange} className="w-full p-2 border rounded" />
                 <select name="role" value={newUser.role} onChange={handleInputChange} className="w-full p-2 border rounded">
-                    <option value="technician">Technician</option>
-                    <option value="biochemist">Biochemist</option>
-                    <option value="superadmin">Super User</option>
+                  <option value="technician">Technician</option>
+                  <option value="biochemist">Biochemist</option>
+                  <option value="admin">Administrador</option>
                 </select>
-                </div>
-                <DialogFooter>
+              </div>
+              <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleCreateUser}>Create</Button>
-                </DialogFooter>
+              </DialogFooter>
             </DialogContent>
-            </Dialog>
+          </Dialog>
         </div>
       </div>
 
@@ -201,23 +200,23 @@ const UsersSettingsTab = () => {
                 {!user.email_confirmed_at && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm"><CheckCircle className="w-4 h-4 mr-2" />Authorize</Button>
+                      <Button variant="outline" size="sm"><CheckCircle className="w-4 h-4 mr-2" />Authorize</Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm Authorization?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                You are about to authorize the user {user.email}. Once authorized, they will be able to access the system.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleAuthorizeUser(user.id, user.email)}>Authorize</AlertDialogAction>
-                        </AlertDialogFooter>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Authorization?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          You are about to authorize the user {user.email}. Once authorized, they will be able to access the system.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleAuthorizeUser(user.id, user.email)}>Authorize</AlertDialogAction>
+                      </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 )}
-                
+
                 <Button variant="ghost" size="icon" onClick={() => toast({ title: '🚧 Coming Soon', description: 'User editing will be available soon.' })}>
                   <Edit className="w-4 h-4" />
                 </Button>

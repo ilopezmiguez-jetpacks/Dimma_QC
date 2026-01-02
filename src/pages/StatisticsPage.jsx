@@ -60,7 +60,7 @@ const StatisticsPage = () => {
 
       } catch (err) {
         console.error("Error fetching statistics reports:", err);
-        toast({ title: "Error", description: "Could not load reports for the selected range.", variant: "destructive" });
+        toast({ title: "Error", description: "No se pudieron cargar los reportes para el rango seleccionado.", variant: "destructive" });
       } finally {
         setLoadingReports(false);
       }
@@ -112,8 +112,8 @@ const StatisticsPage = () => {
   const handleResolveAlarm = (alarmId, action) => {
     resolveAlarm(alarmId, action);
     toast({
-      title: "Alarm Managed",
-      description: `The alarm has been marked as resolved with the action: ${action}.`,
+      title: "Alarma Gestionada",
+      description: `La alarma ha sido marcada como resuelta con la acción: ${action}.`,
     });
   };
 
@@ -121,9 +121,9 @@ const StatisticsPage = () => {
     if (active && payload && payload.length) {
       return (
         <div className="p-2 bg-white border rounded-lg shadow-lg">
-          <p className="font-bold">{`Date: ${label}`}</p>
+          <p className="font-bold">{`Fecha: ${label}`}</p>
           <p className="text-sm" style={{ color: payload[0].stroke }}>{`${selectedParam}: ${payload[0].value}`}</p>
-          {payload[0].payload.rules && <p className="text-xs text-red-500">{`Rules: ${payload[0].payload.rules}`}</p>}
+          {payload[0].payload.rules && <p className="text-xs text-red-500">{`Reglas: ${payload[0].payload.rules}`}</p>}
         </div>
       );
     }
@@ -133,20 +133,20 @@ const StatisticsPage = () => {
   return (
     <>
       <Helmet>
-        <title>Statistics - QC LabControl</title>
-        <meta name="description" content="Equipment performance and quality control statistics." />
+        <title>Estadísticas - QC LabControl</title>
+        <meta name="description" content="Rendimiento de los equipos y estadísticas de control de calidad." />
       </Helmet>
       <div className="space-y-8">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">QC Trend Analysis</h1>
-          <p className="text-muted-foreground mt-1">Visualize and analyze the historical performance of your equipment.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Análisis de Tendencias de CC</h1>
+          <p className="text-muted-foreground mt-1">Visualice y analice el rendimiento histórico de sus equipos.</p>
         </motion.div>
 
         {user?.user_metadata?.role === 'admin' && pendingAlarms.length > 0 && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="medical-card rounded-xl p-6 bg-yellow-50 border-yellow-300">
             <h2 className="text-xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
               <AlertTriangle />
-              Pending Daily Alarms
+              Alarmas Diarias Pendientes
             </h2>
             <div className="space-y-4 max-h-60 overflow-y-auto">
               {pendingAlarms.map(alarm => (
@@ -157,9 +157,9 @@ const StatisticsPage = () => {
                     <p className="text-xs text-gray-400">{new Date(alarm.date).toLocaleString('en-US')}</p>
                   </div>
                   <div className="flex gap-2 mt-2 md:mt-0">
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Repeat Control')}><Repeat className="w-4 h-4 mr-1" /> Repeat</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Adjust Factors')}><Settings2 className="w-4 h-4 mr-1" /> Adjust</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Request Technical Service')}><Wrench className="w-4 h-4 mr-1" /> Tech Service</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Repeat Control')}><Repeat className="w-4 h-4 mr-1" /> Repetir</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Adjust Factors')}><Settings2 className="w-4 h-4 mr-1" /> Ajustar</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Request Technical Service')}><Wrench className="w-4 h-4 mr-1" /> Servicio Técnico</Button>
                   </div>
                 </div>
               ))}
@@ -170,17 +170,17 @@ const StatisticsPage = () => {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="medical-card rounded-xl p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <select value={selectedEquipmentId} onChange={(e) => handleEquipmentChange(e.target.value)} className="p-2 border border-border rounded-md w-full">
-              <option value="" disabled>Select Equipment</option>
+              <option value="" disabled>Seleccionar Equipo</option>
               {equipment.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
 
             <select value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="p-2 border border-border rounded-md w-full" disabled={!activeLot}>
-              <option value="" disabled>Level</option>
+              <option value="" disabled>Nivel</option>
               {activeLot && activeLot.qc_params && Object.keys(activeLot.qc_params).map(level => <option key={level} value={level}>{level}</option>)}
             </select>
 
             <select value={selectedParam} onChange={(e) => setSelectedParam(e.target.value)} className="p-2 border border-border rounded-md w-full" disabled={!selectedLevel}>
-              <option value="" disabled>Parameter</option>
+              <option value="" disabled>Parámetro</option>
               {activeLot && activeLot.qc_params && activeLot.qc_params[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel]).map(param => <option key={param} value={param}>{param}</option>)}
             </select>
 
@@ -193,7 +193,7 @@ const StatisticsPage = () => {
           {loadingReports ? (
             <div className="h-96 flex flex-col items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
-              <p className="text-muted-foreground">Loading chart data...</p>
+              <p className="text-muted-foreground">Cargando datos del gráfico...</p>
             </div>
           ) : chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
@@ -205,7 +205,7 @@ const StatisticsPage = () => {
                 <Legend />
                 {qcParamsForChart && (
                   <>
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Mean" stroke="black" strokeDasharray="3 3" />
+                    <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Media" stroke="black" strokeDasharray="3 3" />
                     <ReferenceLine y={parseFloat(qcParamsForChart.mean) + parseFloat(qcParamsForChart.sd)} label="+1s" stroke="green" strokeDasharray="3 3" />
                     <ReferenceLine y={parseFloat(qcParamsForChart.mean) - parseFloat(qcParamsForChart.sd)} label="-1s" stroke="green" strokeDasharray="3 3" />
                     <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 2 * parseFloat(qcParamsForChart.sd)} label="+2s" stroke="orange" strokeDasharray="3 3" />
@@ -220,8 +220,8 @@ const StatisticsPage = () => {
           ) : (
             <div className="h-96 flex flex-col items-center justify-center text-center text-muted-foreground">
               <Sliders className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-xl font-semibold text-foreground">No Data to Display</h3>
-              <p>No reports were found for the selected filters, or there is no active lot for the equipment.</p>
+              <h3 className="text-xl font-semibold text-foreground">No hay datos para mostrar</h3>
+              <p>No se encontraron reportes para los filtros seleccionados, o no hay un lote activo para el equipo.</p>
             </div>
           )}
         </motion.div>

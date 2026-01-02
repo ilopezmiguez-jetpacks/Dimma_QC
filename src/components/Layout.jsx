@@ -22,8 +22,8 @@ const SidebarLink = ({ to, icon: Icon, children }) => {
     <Link
       to={to}
       className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-          ? 'bg-primary/10 text-primary font-medium'
-          : 'text-gray-600 hover:bg-gray-100'
+        ? 'bg-primary/10 text-primary font-medium'
+        : 'text-gray-600 hover:bg-gray-100'
         }`}
     >
       <Icon className="w-5 h-5" />
@@ -34,7 +34,7 @@ const SidebarLink = ({ to, icon: Icon, children }) => {
 
 const Layout = ({ children }) => {
   const { user, signOut } = useAuth();
-  const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+  const isAdmin = user?.user_metadata?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -81,7 +81,7 @@ const Layout = ({ children }) => {
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <BadgeCheck className="mr-2 h-4 w-4" />
-                <span>Role: <span className="font-semibold capitalize">{user?.profile?.role || 'Technician'}</span></span>
+                <span>Rol: <span className="font-semibold capitalize">{user?.profile?.role === 'admin' ? 'Administrador' : user?.profile?.role === 'biochemist' ? 'Bioquímico' : 'Técnico'}</span></span>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Building2 className="mr-2 h-4 w-4" />

@@ -2,7 +2,7 @@ export const hasPermission = (user, action) => {
     const role = user?.user_metadata?.role;
     if (!role) return false;
 
-    if (role === 'admin' || role === 'superadmin') return true; // Superadmin/Admin has all permissions by default
+    if (role === 'admin') return true; // Admin has all permissions by default
 
     switch (action) {
         case 'validate_results':

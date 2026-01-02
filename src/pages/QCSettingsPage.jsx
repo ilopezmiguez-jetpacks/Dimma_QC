@@ -594,7 +594,7 @@ const QCSettingsPage = ({ isTab = false }) => {
     const { user } = useAuth();
     const { toast } = useToast();
 
-    const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+    const isAdmin = user?.user_metadata?.role === 'admin';
     const canManageLots = hasPermission(user, 'manage_lots');
     const [expandedEqId, setExpandedEqId] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);

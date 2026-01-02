@@ -83,7 +83,7 @@ export const QCDataProvider = ({ children }) => {
         setLaboratories(labs || []);
 
         // Determine current Lab context
-        const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === 'superadmin';
+        const isAdmin = user.user_metadata?.role === 'admin';
 
         if (!isAdmin && profile?.laboratory_id) {
           setCurrentLabId(profile.laboratory_id); // Lock to assigned lab
@@ -299,7 +299,7 @@ export const QCDataProvider = ({ children }) => {
   const addEquipment = async (newEquipmentData) => {
     try {
       let targetLabId = newEquipmentData.laboratoryId;
-      const isAdmin = user?.user_metadata?.role === 'admin' || user?.user_metadata?.role === 'superadmin';
+      const isAdmin = user?.user_metadata?.role === 'admin';
 
       if (!targetLabId) {
         if (currentLabId && currentLabId !== 'all') {

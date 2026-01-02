@@ -56,9 +56,9 @@ const Dashboard = () => {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return '¡Buenos días';
+    if (hour < 18) return '¡Buenas tardes';
+    return '¡Buenas noches';
   };
 
   const StatCard = ({ icon: Icon, title, value, subtitle, color, onClick }) => (
@@ -100,12 +100,12 @@ const Dashboard = () => {
                 {getGreeting()}, {displayUserName}! 👋
               </h1>
               <p className="text-muted-foreground mt-1">
-                Summary of today's quality control status.
+                Resumen del estado de control de calidad hoy.
               </p>
             </div>
             <div className="mt-4 md:mt-0 flex items-center space-x-2 text-sm text-muted-foreground">
               <Calendar className="w-4 h-4" />
-              <span>{new Date().toLocaleDateString('en-US', {
+              <span>{new Date().toLocaleDateString('es-ES', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -118,33 +118,33 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard
             icon={SlidersHorizontal}
-            title="Monitored Equipment"
+            title="Equipos Monitoreados"
             value={stats.totalEquipment}
-            subtitle="Total equipment"
+            subtitle="Total de equipos"
             color="teal"
             onClick={() => navigate('/equipment')}
           />
           <StatCard
             icon={CheckCircle}
-            title="Equipment OK"
+            title="Equipos OK"
             value={stats.okEquipment}
-            subtitle="Operating in range"
+            subtitle="Operando en rango"
             color="green"
             onClick={() => navigate('/equipment?status=ok')}
           />
           <StatCard
             icon={AlertTriangle}
-            title="Equipment with Alerts"
+            title="Equipos con Alertas"
             value={stats.warningEquipment + stats.errorEquipment}
-            subtitle="Require attention"
+            subtitle="Requieren atención"
             color="orange"
             onClick={() => navigate('/equipment?status=issue')}
           />
           <StatCard
             icon={Wrench}
-            title="Maintenance"
+            title="Mantenimiento"
             value={stats.maintenanceDue}
-            subtitle="Services overdue"
+            subtitle="Servicios vencidos"
             color="red"
             onClick={() => navigate('/equipment?status=maintenance')}
           />
@@ -154,7 +154,7 @@ const Dashboard = () => {
           <div
             className="lg:col-span-2 medical-card rounded-xl p-6"
           >
-            <h2 className="text-xl font-bold text-foreground mb-4">Equipment with Issues</h2>
+            <h2 className="text-xl font-bold text-foreground mb-4">Equipos con Problemas</h2>
             {equipmentWithIssues.length > 0 ? (
               <div className="space-y-4">
                 {equipmentWithIssues.map(eq => (
@@ -165,9 +165,9 @@ const Dashboard = () => {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className={`font-bold text-sm ${eq.status === 'error' ? 'text-red-600' : 'text-yellow-600'}`}>
-                        {eq.status === 'error' ? 'ERROR' : 'WARNING'}
+                        {eq.status === 'error' ? 'ERROR' : 'ADVERTENCIA'}
                       </span>
-                      <button onClick={() => navigate(`/equipment/${eq.id}`)} className="bg-white text-black text-sm py-1 px-3 rounded-md border">View Details</button>
+                      <button onClick={() => navigate(`/equipment/${eq.id}`)} className="bg-white text-black text-sm py-1 px-3 rounded-md border">Ver Detalles</button>
                     </div>
                   </div>
                 ))}
@@ -175,8 +175,8 @@ const Dashboard = () => {
             ) : (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-                <p className="font-semibold text-gray-700">All systems normal!</p>
-                <p className="text-sm text-gray-500">No equipment with warnings or errors.</p>
+                <p className="font-semibold text-gray-700">¡Todos los sistemas normales!</p>
+                <p className="text-sm text-gray-500">No hay equipos con advertencias o errores.</p>
               </div>
             )}
           </div>
@@ -185,7 +185,7 @@ const Dashboard = () => {
             className="medical-card rounded-xl p-6 flex flex-col justify-between"
           >
             <div>
-              <h2 className="text-xl font-bold text-foreground mb-2">Today's Reports</h2>
+              <h2 className="text-xl font-bold text-foreground mb-2">Reportes de Hoy</h2>
               {loadingStats ? (
                 <div className="h-12 flex items-center">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -193,11 +193,11 @@ const Dashboard = () => {
               ) : (
                 <p className="text-5xl font-bold text-primary">{stats.reportsToday}</p>
               )}
-              <p className="text-muted-foreground">Quality controls submitted.</p>
+              <p className="text-muted-foreground">Controles de calidad enviados.</p>
             </div>
             <button onClick={() => navigate('/statistics')} className="bg-primary text-white w-full mt-4 py-2 px-4 rounded-md flex items-center justify-center">
               <BarChart3 className="w-4 h-4 mr-2" />
-              View Statistics
+              Ver Estadísticas
             </button>
           </div>
         </div>
