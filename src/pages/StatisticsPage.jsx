@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { AlertTriangle, Repeat, Wrench, Settings2, Sliders, Loader2 } from 'lucide-react';
+import { AlertTriangle, Repeat, Wrench, Settings2, Sliders, Loader2, RefreshCw } from 'lucide-react';
 
 const StatisticsPage = () => {
   const { equipment, alarms, resolveAlarm } = useQCData(); // Removed qcReports
@@ -29,45 +29,52 @@ const StatisticsPage = () => {
   const [fetchedReports, setFetchedReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
 
+  // Effect to handle initial equipment selection
+  useEffect(() => {
+    if (!selectedEquipmentId && equipment.length > 0) {
+      setSelectedEquipmentId(equipment[0].id);
+    }
+  }, [equipment, selectedEquipmentId]);
+
+  const fetchReports = useCallback(async () => {
+    if (!selectedEquipmentId) return;
+    setLoadingReports(true);
+    const start = new Date(dateRange.start);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dateRange.end);
+    end.setHours(23, 59, 59, 999);
+
+    try {
+      const { data, error } = await supabase
+        .from('qc_reports')
+        .select('*')
+        .eq('equipment_id', selectedEquipmentId)
+        .gte('date', start.toISOString())
+        .lte('date', end.toISOString())
+        .order('date', { ascending: true }); // Chart needs ascending
+
+      if (error) throw error;
+
+      const formattedReports = (data || []).map(r => ({
+        ...r,
+        equipmentId: r.equipment_id,
+        lotNumber: r.lot_number,
+        westgardRules: r.westgard_rules
+      }));
+      setFetchedReports(formattedReports);
+
+    } catch (err) {
+      console.error("Error fetching statistics reports:", err);
+      toast({ title: "Error", description: "No se pudieron cargar los reportes para el rango seleccionado.", variant: "destructive" });
+    } finally {
+      setLoadingReports(false);
+    }
+  }, [selectedEquipmentId, dateRange.start, dateRange.end, toast]);
+
   // Effect to fetch reports when Equipment or Date Range changes
   useEffect(() => {
-    const fetchReports = async () => {
-      if (!selectedEquipmentId) return;
-      setLoadingReports(true);
-      const start = new Date(dateRange.start);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(dateRange.end);
-      end.setHours(23, 59, 59, 999);
-
-      try {
-        const { data, error } = await supabase
-          .from('qc_reports')
-          .select('*')
-          .eq('equipment_id', selectedEquipmentId)
-          .gte('date', start.toISOString())
-          .lte('date', end.toISOString())
-          .order('date', { ascending: true }); // Chart needs ascending
-
-        if (error) throw error;
-
-        const formattedReports = (data || []).map(r => ({
-          ...r,
-          equipmentId: r.equipment_id,
-          lotNumber: r.lot_number,
-          westgardRules: r.westgard_rules
-        }));
-        setFetchedReports(formattedReports);
-
-      } catch (err) {
-        console.error("Error fetching statistics reports:", err);
-        toast({ title: "Error", description: "No se pudieron cargar los reportes para el rango seleccionado.", variant: "destructive" });
-      } finally {
-        setLoadingReports(false);
-      }
-    };
-
     fetchReports();
-  }, [selectedEquipmentId, dateRange.start, dateRange.end, toast]);
+  }, [fetchReports]);
 
 
   useEffect(() => {
@@ -137,9 +144,15 @@ const StatisticsPage = () => {
         <meta name="description" content="Rendimiento de los equipos y estadísticas de control de calidad." />
       </Helmet>
       <div className="space-y-8">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Análisis de Tendencias de CC</h1>
-          <p className="text-muted-foreground mt-1">Visualice y analice el rendimiento histórico de sus equipos.</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Análisis de Tendencias de CC</h1>
+            <p className="text-muted-foreground mt-1">Visualice y analice el rendimiento histórico de sus equipos.</p>
+          </div>
+          <Button onClick={fetchReports} disabled={loadingReports} variant="outline" className="w-fit">
+            <RefreshCw className={`w-4 h-4 mr-2 ${loadingReports ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
         </motion.div>
 
         {user?.user_metadata?.role === 'admin' && pendingAlarms.length > 0 && (

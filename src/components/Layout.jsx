@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { LayoutDashboard, Microscope, Settings, LogOut, BarChart3, Activity, Upload, User, Building2, BadgeCheck } from 'lucide-react';
+import { LayoutDashboard, Microscope, Settings, LogOut, BarChart3, Activity, Upload, User, Building2, BadgeCheck, Menu } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import LabSelector from '@/components/LabSelector';
 
 const SidebarLink = ({ to, icon: Icon, children }) => {
@@ -105,7 +110,72 @@ const Layout = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Mobile Menu Trigger could go here */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64">
+                <div className="flex flex-col h-full">
+                  <div className="p-6 border-b">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xl">
+                      <Activity className="w-6 h-6" />
+                      <span>DIMMA QC</span>
+                    </div>
+                  </div>
+
+                  <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <SidebarLink to="/" icon={LayoutDashboard}>Tablero</SidebarLink>
+                    <SidebarLink to="/equipment" icon={Microscope}>Equipos</SidebarLink>
+                    <SidebarLink to="/load-control" icon={Upload}>Cargar Control</SidebarLink>
+                    <SidebarLink to="/statistics" icon={BarChart3}>Estadísticas</SidebarLink>
+                    {isAdmin && (
+                      <SidebarLink to="/settings" icon={Settings}>Configuración</SidebarLink>
+                    )}
+                  </nav>
+
+                  <div className="p-4 border-t bg-white">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-gray-100 transition-colors text-left focus:outline-none">
+                          <Avatar>
+                            <AvatarImage src={user?.profile?.avatar_url} />
+                            <AvatarFallback>{user?.email?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{user?.profile?.full_name || user?.user_metadata?.full_name || 'Usuario'}</p>
+                            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                          </div>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56" align="end" forceMount>
+                        <DropdownMenuLabel className="font-normal">
+                          <div className="flex flex-col space-y-1">
+                            <p className="text-sm font-medium leading-none">{user?.profile?.full_name}</p>
+                            <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                          </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>
+                          <BadgeCheck className="mr-2 h-4 w-4" />
+                          <span>Rol: <span className="font-semibold capitalize">{user?.profile?.role === 'admin' ? 'Administrador' : user?.profile?.role === 'biochemist' ? 'Bioquímico' : 'Técnico'}</span></span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Building2 className="mr-2 h-4 w-4" />
+                          <span>Lab: <span className="font-semibold">{user?.profile?.laboratory?.name || 'N/A'}</span></span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={signOut} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          <span>Cerrar Sesión</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </header>
 

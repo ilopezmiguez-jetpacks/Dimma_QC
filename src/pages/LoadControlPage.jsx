@@ -6,7 +6,7 @@ import { useQCData } from '@/contexts/QCDataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Save, AlertTriangle, CheckCircle, Sliders, ChevronDown, Plus, X } from 'lucide-react';
+import { Save, AlertTriangle, CheckCircle, Sliders, ChevronDown } from 'lucide-react';
 import { predefinedParams } from '@/lib/parameters';
 
 const LoadControlPage = () => {
@@ -80,26 +80,22 @@ const LoadControlPage = () => {
         setInputValues(prev => ({ ...prev, [param]: value }));
     };
 
-    const handleAddManualParam = () => {
-        const newParamName = `Manual_${Date.now()}`;
-        setFormParams(prev => ({ ...prev, [newParamName]: { mean: 0, sd: 0, unit: '' } }));
-    };
-
-    const handleRemoveParam = (paramName) => {
-        setFormParams(prev => {
-            const newParams = { ...prev };
-            delete newParams[paramName];
-            return newParams;
-        });
-        setInputValues(prev => {
-            const newValues = { ...prev };
-            delete newValues[paramName];
-            return newValues;
-        });
-    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        // Validation: Every parameter in formParams must have a non-empty value in inputValues
+        const missingFields = Object.keys(formParams).some(param => !inputValues[param] || inputValues[param].toString().trim() === '');
+
+        if (missingFields) {
+            toast({
+                title: "Error de Validación",
+                description: "Todos los parámetros son obligatorios. Por favor complete todos los campos.",
+                variant: 'destructive',
+            });
+            return;
+        }
+
         const report = {
             equipmentId: selectedEquipmentId,
             lotNumber: activeLot.lotNumber,
@@ -128,7 +124,7 @@ const LoadControlPage = () => {
         }
     };
 
-    const canSubmit = Object.values(inputValues).some(v => v && v.trim() !== '');
+    const canSubmit = Object.keys(formParams).length > 0;
 
     // Removed lastReportForLevel logic as we now fetch it on demand into 'lastReport' state
 
@@ -202,7 +198,6 @@ const LoadControlPage = () => {
                                                     {lastValue !== undefined && ` | Último: ${lastValue}`}
                                                 </p>
                                                 <input type="number" step="any" value={inputValues[param] || ''} onChange={(e) => handleInputChange(param, e.target.value)} className="mt-1 w-full p-2 border border-border rounded-md" placeholder={`Valor para ${param}`} />
-                                                <Button type="button" variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveParam(param)}><X className="w-4 h-4 text-red-500" /></Button>
                                             </div>
                                         );
                                     })}
@@ -210,9 +205,6 @@ const LoadControlPage = () => {
                                 <div className="pt-4 border-t flex flex-col sm:flex-row gap-2">
                                     <Button type="submit" disabled={!canSubmit} className="w-full sm:w-auto flex-grow medical-gradient text-white">
                                         <Save className="w-4 h-4 mr-2" /> Guardar Control
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={handleAddManualParam} className="w-full sm:w-auto">
-                                        <Plus className="w-4 h-4 mr-2" /> Agregar Parámetro
                                     </Button>
                                 </div>
                             </div>

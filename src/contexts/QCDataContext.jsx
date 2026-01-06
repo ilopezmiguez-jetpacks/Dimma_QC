@@ -286,13 +286,45 @@ export const QCDataProvider = ({ children }) => {
         westgardRules: savedReport.westgard_rules
       };
 
-      // We no longer update global qcReports state
+      // 1. Update Equipment Status in Database
+      await supabase
+        .from('equipment')
+        .update({ status: finalStatus })
+        .eq('id', reportData.equipmentId);
+
+      // 2. Update Local State immediately
+      setEquipment(prev => prev.map(eq =>
+        eq.id === reportData.equipmentId
+          ? { ...eq, status: finalStatus }
+          : eq
+      ));
+
       return formattedReport;
 
     } catch (err) {
       console.error("Error saving report:", err);
       toast({ title: "Error", description: "No se pudo guardar el reporte de QC.", variant: "destructive" });
       return { status: 'error' };
+    }
+  };
+
+  const validateQCReport = async (reportId, userId) => {
+    try {
+      const { error } = await supabase
+        .from('qc_reports')
+        .update({
+          is_validated: true,
+          validated_by: userId,
+          validated_at: new Date().toISOString()
+        })
+        .eq('id', reportId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      console.error("Error validating report:", err);
+      toast({ title: "Error", description: "No se pudo validar el reporte de QC.", variant: "destructive" });
+      throw err;
     }
   };
 
@@ -450,16 +482,39 @@ export const QCDataProvider = ({ children }) => {
 
   const updateEquipmentDetails = async (id, updatedData) => {
     try {
-      const { lots, dailyDeviationThreshold, maintenanceDue, laboratoryName, typeName, ...cleanData } = updatedData;
+      // 1. Extract known app-specific fields that aren't DB columns
+      const {
+        lots,
+        dailyDeviationThreshold,
+        maintenanceDue,
+        laboratoryName,
+        typeName,
+        // 2. Extract JOINED objects that must not be sent to Supabase
+        laboratory,
+        type,
+        unit,
+        // 3. Keep the rest as clean data
+        ...cleanData
+      } = updatedData;
+
+      // 4. Map app camelCase to DB snake_case
       const dbData = {
         ...cleanData,
         daily_deviation_threshold: dailyDeviationThreshold,
         maintenance_due: maintenanceDue
       };
+
+      // 5. Ensure IDs are null if empty strings (Sanitization)
+      if (dbData.laboratory_id === '') dbData.laboratory_id = null;
+      if (dbData.equipment_type_id === '') dbData.equipment_type_id = null;
+
       const { error } = await supabase.from('equipment').update(dbData).eq('id', id);
       if (error) throw error;
+
+      // 6. Update local state
       setEquipment(prev => prev.map(eq => eq.id === id ? { ...eq, ...updatedData } : eq));
     } catch (err) {
+      console.error("Update Error:", err);
       throw err;
     }
   };
@@ -475,6 +530,80 @@ export const QCDataProvider = ({ children }) => {
     }
   };
 
+  const deleteLot = async (equipmentId, lotId) => {
+    try {
+      const { error } = await supabase.from('control_lots').delete().eq('id', lotId);
+      if (error) throw error;
+
+      setEquipment(prev => prev.map(eq => {
+        if (eq.id === equipmentId) {
+          return { ...eq, lots: (eq.lots || []).filter(l => l.id !== lotId) };
+        }
+        return eq;
+      }));
+    } catch (err) {
+      console.error("Error deleting lot:", err);
+      throw err;
+    }
+  };
+
+  const updateLotDetails = async (equipmentId, lotId, { lotNumber, expirationDate }) => {
+    try {
+      const { data, error } = await supabase
+        .from('control_lots')
+        .update({
+          lot_number: lotNumber,
+          expiration_date: expirationDate
+        })
+        .eq('id', lotId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setEquipment(prev => prev.map(eq => {
+        if (eq.id === equipmentId) {
+          return {
+            ...eq,
+            lots: eq.lots.map(l => l.id === lotId ? {
+              ...l,
+              lotNumber: data.lot_number,
+              expirationDate: data.expiration_date
+            } : l)
+          };
+        }
+        return eq;
+      }));
+    } catch (err) {
+      console.error("Error updating lot details:", err);
+      throw err;
+    }
+  };
+
+  const deactivateLot = async (equipmentId) => {
+    try {
+      const { error } = await supabase
+        .from('control_lots')
+        .update({ is_active: false })
+        .eq('equipment_id', equipmentId);
+
+      if (error) throw error;
+
+      setEquipment(prev => prev.map(eq => {
+        if (eq.id === equipmentId) {
+          return {
+            ...eq,
+            lots: (eq.lots || []).map(l => ({ ...l, isActive: false }))
+          };
+        }
+        return eq;
+      }));
+    } catch (err) {
+      console.error("Error deactivating lots:", err);
+      throw err;
+    }
+  };
+
   const value = {
     equipment,
     alarms,
@@ -486,12 +615,16 @@ export const QCDataProvider = ({ children }) => {
     setCurrentLabId,
     loading,
     addQCReport,
+    validateQCReport,
     addEquipment,
     addLot,
     activateLot,
+    deactivateLot,
     updateLotParams,
     updateEquipmentDetails,
     deleteEquipment,
+    deleteLot,
+    updateLotDetails,
     refetch: fetchAllData,
     refreshParameters
   };

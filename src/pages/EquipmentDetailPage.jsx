@@ -8,7 +8,8 @@ import { hasPermission } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { CheckCircle, AlertTriangle, Wrench, Save, Edit, Pencil, BarChart, ChevronDown, ChevronUp, PackagePlus, Trash2, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Wrench, Save, Edit, Pencil, BarChart, ChevronDown, ChevronUp, PackagePlus, Trash2, Loader2, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import EditQCReportModal from '@/components/EditQCReportModal';
 import {
   AlertDialog,
@@ -114,8 +115,7 @@ const EquipmentDetailPage = () => {
           .from('qc_reports')
           .select('*')
           .eq('equipment_id', equipmentId)
-          .order('created_at', { ascending: false })
-          .limit(100);
+          .order('created_at', { ascending: true });
 
         if (error) throw error;
 
@@ -466,6 +466,7 @@ const EquipmentDetailPage = () => {
                         <th className="py-2 px-4">Técnico</th>
                         <th className="py-2 px-4">Nivel</th>
                         <th className="py-2 px-4">Estado</th>
+                        <th className="py-2 px-4">Etapa</th>
                         <th className="py-2 px-4">Reglas Westgard</th>
                         {isAdmin && <th className="py-2 px-4">Acciones</th>}
                       </tr>
@@ -473,13 +474,20 @@ const EquipmentDetailPage = () => {
                     <tbody>
                       {reports
                         .filter(r => r.equipmentId === equipmentId && r.lotNumber === activeLot.lotNumber)
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
                         .map(report => (
                           <tr key={report.id} className="border-b border-border hover:bg-secondary/50">
                             <td className="py-2 px-4">{new Date(report.date).toLocaleString()}</td>
                             <td className="py-2 px-4">{report.technician}</td>
                             <td className="py-2 px-4">{report.level}</td>
-                            <td className={`py-2 px-4 font-semibold ${getStatusInfo(report.status).color}`}>{report.status.toUpperCase()}</td>
+                            <td className={`py-2 px-4 font-semibold ${getStatusInfo(report.status).color}`}>{getStatusInfo(report.status).text.toUpperCase()}</td>
+                            <td className="py-2 px-4">
+                              {report.is_validated === true ? (
+                                <Badge variant="success" className="bg-green-100 text-green-700 hover:bg-green-100">Validado</Badge>
+                              ) : (
+                                <Badge variant="warning" className="bg-orange-100 text-orange-700 hover:bg-orange-100">Pendiente de Validación</Badge>
+                              )}
+                            </td>
                             <td className="py-2 px-4 text-red-600">{(report.westgardRules || []).join(', ')}</td>
                             {isAdmin && (
                               <td className="py-2 px-4">

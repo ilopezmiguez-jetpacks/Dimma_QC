@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 const EquipmentPage = () => {
   const { equipment, currentLabId, laboratories, updateEquipmentDetails } = useQCData();
@@ -38,6 +39,7 @@ const EquipmentPage = () => {
   const [editingEquipment, setEditingEquipment] = useState(null);
   const [equipmentTypes, setEquipmentTypes] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingCounts, setPendingCounts] = useState({});
 
   const isAdmin = user?.user_metadata?.role === 'admin';
 
@@ -65,6 +67,25 @@ const EquipmentPage = () => {
       fetchTypes();
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    const fetchPendingCounts = async () => {
+      const { data } = await supabase
+        .from('qc_reports')
+        .select('equipment_id')
+        .eq('is_validated', false);
+
+      if (data) {
+        // Aggregate counts locally
+        const counts = data.reduce((acc, curr) => {
+          acc[curr.equipment_id] = (acc[curr.equipment_id] || 0) + 1;
+          return acc;
+        }, {});
+        setPendingCounts(counts);
+      }
+    };
+    fetchPendingCounts();
+  }, []);
 
   const filteredEquipment = equipment.filter(eq => {
     const matchesSearch = eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -165,6 +186,7 @@ const EquipmentPage = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const maintenanceDue = maintenanceDate < today;
+    const pendingCount = pendingCounts[eq.id] || 0;
 
     return (
       <div
@@ -205,10 +227,17 @@ const EquipmentPage = () => {
             </div>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-border text-right">
-          <Button onClick={() => navigate(`/load-control?equipmentId=${eq.id}`)} className="w-full">
+        <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+          <div className="flex-grow">
+            {pendingCount > 0 && (
+              <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100 border-none px-2 py-0.5 text-[10px] sm:text-xs">
+                {pendingCount} Pendiente{pendingCount > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+          <Button onClick={() => navigate(`/load-control?equipmentId=${eq.id}`)} size="sm">
             <Upload className="w-4 h-4 mr-2" />
-            Cargar Control
+            Cargar
           </Button>
         </div>
       </div>

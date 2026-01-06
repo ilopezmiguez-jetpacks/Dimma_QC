@@ -1,17 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Calendar, BarChart3, Loader2 } from 'lucide-react';
+import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Calendar, BarChart3, Loader2, Check, Clock, Eye } from 'lucide-react';
 import { useQCData } from '@/contexts/QCDataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { supabase } from '@/lib/customSupabaseClient'; // Import supabase
+import { supabase } from '@/lib/customSupabaseClient';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const Dashboard = () => {
-  const { equipment } = useQCData(); // Removed qcReports
+  const { equipment, validateQCReport } = useQCData();
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [reportsTodayCount, setReportsTodayCount] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [pendingReports, setPendingReports] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const role = user?.profile?.role || user?.user_metadata?.role;
+  const isBiochemist = role === 'biochemist';
+  const isAdmin = role === 'admin';
+  const isTechnician = role === 'technician';
+  const canValidate = isAdmin || isBiochemist;
 
   const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -44,6 +72,53 @@ const Dashboard = () => {
 
     fetchTodayStats();
   }, [user]);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      if (!user || !canValidate) return;
+      setLoadingPending(true);
+      try {
+        let query = supabase
+          .from('qc_reports')
+          .select(`
+            *,
+            equipment:equipment!inner(name, model, laboratory_id)
+          `)
+          .eq('is_validated', false)
+          .order('date', { ascending: false });
+
+        if (isBiochemist && user.profile?.laboratory_id) {
+          query = query.eq('equipment.laboratory_id', user.profile.laboratory_id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setPendingReports(data || []);
+      } catch (err) {
+        console.error("Error fetching pending validations:", err);
+      } finally {
+        setLoadingPending(false);
+      }
+    };
+
+    fetchPending();
+  }, [user, canValidate, isBiochemist]);
+
+  const handleViewReport = (report) => {
+    setSelectedReport(report);
+    setIsModalOpen(true);
+  };
+
+  const handleValidate = async (reportId) => {
+    try {
+      await validateQCReport(reportId, user.id);
+      setPendingReports(prev => prev.filter(r => r.id !== reportId));
+      setIsModalOpen(false);
+      toast({ title: "Control Validado", description: "El reporte ha sido validado correctamente." });
+    } catch (err) {
+      console.error("Error validating report:", err);
+    }
+  };
 
   const stats = {
     totalEquipment: equipment.length,
@@ -140,15 +215,116 @@ const Dashboard = () => {
             color="orange"
             onClick={() => navigate('/equipment?status=issue')}
           />
-          <StatCard
-            icon={Wrench}
-            title="Mantenimiento"
-            value={stats.maintenanceDue}
-            subtitle="Servicios vencidos"
-            color="red"
-            onClick={() => navigate('/equipment?status=maintenance')}
-          />
+          {!isTechnician && (
+            <StatCard
+              icon={Wrench}
+              title="Mantenimiento"
+              value={stats.maintenanceDue}
+              subtitle="Servicios vencidos"
+              color="red"
+              onClick={() => navigate('/equipment?status=maintenance')}
+            />
+          )}
         </div>
+
+        {canValidate && (
+          <div className="medical-card rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-500" />
+                Validaciones Pendientes
+              </h2>
+              <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-bold">
+                {pendingReports.length} reportes
+              </span>
+            </div>
+
+            {loadingPending ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : pendingReports.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Equipo</TableHead>
+                      <TableHead>Fecha/Hora</TableHead>
+                      <TableHead>Nivel</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingReports.map((report) => (
+                      <TableRow
+                        key={report.id}
+                        className="cursor-pointer hover:bg-muted transition-colors"
+                        onClick={() => handleViewReport(report)}
+                      >
+                        <TableCell className="font-semibold text-foreground">
+                          {report.equipment?.name}
+                          <p className="text-xs text-muted-foreground font-normal">{report.equipment?.model}</p>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(report.date).toLocaleString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-1 rounded bg-gray-100 text-gray-700 font-medium">
+                            Nivel {report.level}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${report.status === 'ok' ? 'bg-green-100 text-green-700' :
+                            report.status === 'warning' ? 'bg-orange-100 text-orange-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                            {report.status.toUpperCase()}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewReport(report);
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground transition-colors"
+                              title="Ver detalles"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleValidate(report.id);
+                              }}
+                              className="bg-primary hover:bg-primary/90 text-white p-1.5 rounded-lg transition-colors flex items-center justify-center"
+                              title="Validar Control"
+                            >
+                              <Check className="w-4 h-4" />
+                              <span className="ml-1 text-xs">Validar</span>
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50/30 rounded-lg border border-dashed">
+                <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-2 opacity-50" />
+                <p className="text-muted-foreground">No hay validaciones pendientes.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div
@@ -202,6 +378,67 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Detalles del Reporte</DialogTitle>
+            <DialogDescription>
+              Valores del control para {selectedReport?.equipment?.name} (Nivel {selectedReport?.level})
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedReport && (
+            <div className="py-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Parámetro</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(selectedReport.values).map(([param, value]) => (
+                    <TableRow key={param}>
+                      <TableCell className="font-medium">{param}</TableCell>
+                      <TableCell className="text-right">{value}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {selectedReport.westgard_rules?.length > 0 && (
+                <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Reglas Westgard Violadas:
+                  </p>
+                  <ul className="text-xs text-orange-700 list-disc list-inside">
+                    {selectedReport.westgard_rules.map((rule, idx) => (
+                      <li key={idx}>{rule}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => handleValidate(selectedReport.id)}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              Validar Reporte
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

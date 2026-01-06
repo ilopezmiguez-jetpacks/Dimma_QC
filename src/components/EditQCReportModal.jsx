@@ -33,7 +33,7 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
   const handleValueChange = (param, value) => {
     setValues(prev => ({ ...prev, [param]: value }));
   };
-  
+
   const handleNewParamChange = (index, field, value) => {
     const updated = [...newParams];
     updated[index][field] = value;
@@ -57,9 +57,9 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
       if (param.name && param.value && param.mean && param.sd) {
         combinedValues[param.name] = param.value;
         paramsToAddToLot[param.name] = {
-            mean: parseFloat(param.mean),
-            sd: parseFloat(param.sd),
-            unit: param.unit,
+          mean: parseFloat(param.mean),
+          sd: parseFloat(param.sd),
+          unit: param.unit,
         };
       } else if (param.name || param.value || param.mean || param.sd || param.unit) {
         allNewParamsAreValid = false;
@@ -67,14 +67,14 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
     });
 
     if (!allNewParamsAreValid) {
-        toast({
-            title: "Incomplete Parameter",
-            description: "Please fill all fields (Name, Value, Mean, SD) for each new parameter or remove it.",
-            variant: "destructive",
-        });
-        return;
+      toast({
+        title: "Parámetro Incompleto",
+        description: "Por favor, complete todos los campos (Nombre, Valor, Media, SD) para cada nuevo parámetro o elimínelo.",
+        variant: "destructive",
+      });
+      return;
     }
-    
+
     if (Object.keys(paramsToAddToLot).length > 0) {
       updateLotParams(report.equipmentId, report.lotNumber, report.level, paramsToAddToLot);
     }
@@ -84,12 +84,12 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
     );
 
     const updatedReport = updateQCReport(report.id, numericValues);
-    
+
     onClose();
-    
+
     toast({
-      title: 'Report Updated',
-      description: `The control from ${new Date(report.date).toLocaleDateString()} has been modified.`,
+      title: 'Reporte Actualizado',
+      description: `El control del ${new Date(report.date).toLocaleDateString()} ha sido modificado.`,
       variant: updatedReport.status === 'error' ? 'destructive' : 'default',
     });
   };
@@ -98,13 +98,13 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Quality Control</DialogTitle>
+          <DialogTitle>Editar Control de Calidad</DialogTitle>
           <DialogDescription>
-            Modifying the report for level "{report.level}" from {new Date(report.date).toLocaleString()}.
+            Modificando el reporte para el nivel "{report.level}" del {new Date(report.date).toLocaleString()}.
           </DialogDescription>
         </DialogHeader>
         <datalist id="common-units-modal">
-            {commonUnits.map(unit => <option key={unit} value={unit} />)}
+          {commonUnits.map(unit => <option key={unit} value={unit} />)}
         </datalist>
         <div className="space-y-4 py-4">
           {Object.keys(values).map(param => {
@@ -116,7 +116,7 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
                 <label className="block text-sm font-medium text-gray-700">{param} ({paramData?.unit || 'N/A'})</label>
                 {paramData && (
                   <p className="text-xs text-gray-500">
-                    Expected Range (2s): {(!isNaN(numMean) && !isNaN(numSd)) ? `${(numMean - 2 * numSd).toFixed(2)} - ${(numMean + 2 * numSd).toFixed(2)}` : 'N/A'}
+                    Rango Esperado (2s): {(!isNaN(numMean) && !isNaN(numSd)) ? `${(numMean - 2 * numSd).toFixed(2)} - ${(numMean + 2 * numSd).toFixed(2)}` : 'N/A'}
                   </p>
                 )}
                 <input
@@ -129,70 +129,70 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
               </div>
             );
           })}
-          
+
           <div className="space-y-2">
             {newParams.map((param, index) => (
               <div key={index} className="p-3 border rounded-md space-y-2 relative bg-gray-50">
                 <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => removeNewParamField(index)}>
-                    <X className="h-4 w-4" />
+                  <X className="h-4 w-4" />
                 </Button>
-                <p className="text-sm font-semibold">New Parameter</p>
+                <p className="text-sm font-semibold">Nuevo Parámetro</p>
                 <div className="grid grid-cols-2 gap-2">
-                    <input
-                        type="text"
-                        placeholder="Parameter (e.g., GLU)"
-                        value={param.name}
-                        onChange={e => handleNewParamChange(index, 'name', e.target.value)}
-                        className="p-2 border rounded-md"
-                    />
-                    <input
-                        type="number"
-                        step="any"
-                        placeholder="Measured Value"
-                        value={param.value}
-                        onChange={e => handleNewParamChange(index, 'value', e.target.value)}
-                        className="p-2 border rounded-md"
-                    />
+                  <input
+                    type="text"
+                    placeholder="Parámetro (e.g., GLU)"
+                    value={param.name}
+                    onChange={e => handleNewParamChange(index, 'name', e.target.value)}
+                    className="p-2 border rounded-md"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Valor Medido"
+                    value={param.value}
+                    onChange={e => handleNewParamChange(index, 'value', e.target.value)}
+                    className="p-2 border rounded-md"
+                  />
                 </div>
-                 <div className="grid grid-cols-3 gap-2">
-                     <input
-                        type="number"
-                        step="any"
-                        placeholder="Mean"
-                        value={param.mean}
-                        onChange={e => handleNewParamChange(index, 'mean', e.target.value)}
-                        className="p-2 border rounded-md"
-                    />
-                     <input
-                        type="number"
-                        step="any"
-                        placeholder="SD"
-                        value={param.sd}
-                        onChange={e => handleNewParamChange(index, 'sd', e.target.value)}
-                        className="p-2 border rounded-md"
-                    />
-                     <input
-                        type="text"
-                        list="common-units-modal"
-                        placeholder="Unit"
-                        value={param.unit}
-                        onChange={e => handleNewParamChange(index, 'unit', e.target.value)}
-                        className="p-2 border rounded-md"
-                    />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="Media"
+                    value={param.mean}
+                    onChange={e => handleNewParamChange(index, 'mean', e.target.value)}
+                    className="p-2 border rounded-md"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="SD"
+                    value={param.sd}
+                    onChange={e => handleNewParamChange(index, 'sd', e.target.value)}
+                    className="p-2 border rounded-md"
+                  />
+                  <input
+                    type="text"
+                    list="common-units-modal"
+                    placeholder="Unidad"
+                    value={param.unit}
+                    onChange={e => handleNewParamChange(index, 'unit', e.target.value)}
+                    className="p-2 border rounded-md"
+                  />
                 </div>
               </div>
             ))}
           </div>
 
           <Button variant="outline" size="sm" onClick={addNewParamField}>
-            <Plus className="w-4 h-4 mr-2" /> Add Parameter
+            <Plus className="w-4 h-4 mr-2" /> Agregar Parámetro
           </Button>
 
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleSave} className="medical-gradient text-white">
-            <Save className="w-4 h-4 mr-2" /> Save Changes
+            <Save className="w-4 h-4 mr-2" /> Guardar Cambios
           </Button>
         </DialogFooter>
       </DialogContent>

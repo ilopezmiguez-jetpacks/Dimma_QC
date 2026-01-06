@@ -31,7 +31,7 @@ import { useToast } from '@/components/ui/use-toast';
 import {
     Plus, Check, Save, ChevronDown, ChevronUp, Sliders,
     Thermometer, Microscope, Beaker, PackagePlus, Loader2,
-    Activity, Droplets, Syringe, Building2, Trash2
+    Activity, Droplets, Syringe, Building2, Trash2, Pencil
 } from 'lucide-react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
@@ -246,6 +246,226 @@ const AddEquipmentDialog = ({
     );
 };
 
+const EditEquipmentDialog = ({
+    isOpen,
+    onOpenChange,
+    equipment,
+    onSave,
+    isProcessing,
+    equipmentTypes,
+    laboratories
+}) => {
+    const [formData, setFormData] = useState({
+        name: '',
+        model: '',
+        serial: '',
+        typeId: '',
+        typeName: '',
+        laboratoryId: '',
+        maintenanceDue: '',
+    });
+
+    useEffect(() => {
+        if (isOpen && equipment) {
+            setFormData({
+                name: equipment.name || '',
+                model: equipment.model || '',
+                serial: equipment.serial || '',
+                typeId: equipment.equipment_type_id || '',
+                typeName: equipment.typeName || equipment.equipment_type || '',
+                laboratoryId: equipment.laboratory_id || '',
+                maintenanceDue: equipment.maintenanceDue || '',
+            });
+        }
+    }, [isOpen, equipment]);
+
+    const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleTypeChange = (typeId) => {
+        const selectedType = equipmentTypes.find(t => t.id === typeId);
+        setFormData(prev => ({
+            ...prev,
+            typeId: typeId,
+            typeName: selectedType ? selectedType.name : ''
+        }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(equipment.id, formData);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle>Editar Equipo</DialogTitle>
+                    <DialogDescription>
+                        Actualice los detalles del equipo de laboratorio.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Nombre</label>
+                        <Input
+                            value={formData.name}
+                            onChange={e => handleChange('name', e.target.value)}
+                            className="col-span-3"
+                            required
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Laboratorio</label>
+                        <div className="col-span-3">
+                            <Select
+                                value={formData.laboratoryId}
+                                onValueChange={(val) => handleChange('laboratoryId', val)}
+                                required
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar Laboratorio" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {laboratories.map(lab => (
+                                        <SelectItem key={lab.id} value={lab.id}>{lab.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Modelo</label>
+                        <Input
+                            value={formData.model}
+                            onChange={e => handleChange('model', e.target.value)}
+                            className="col-span-3"
+                            required
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Serie</label>
+                        <Input
+                            value={formData.serial}
+                            onChange={e => handleChange('serial', e.target.value)}
+                            className="col-span-3"
+                            required
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Tipo</label>
+                        <div className="col-span-3">
+                            <Select value={formData.typeId} onValueChange={handleTypeChange} required>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar tipo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {equipmentTypes.map((type) => (
+                                        <SelectItem key={type.id} value={type.id}>
+                                            <div className="flex items-center">
+                                                {getIconForType(type.name)}
+                                                {type.name}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <label className="text-right text-sm font-medium">Mantenimiento</label>
+                        <Input
+                            type="date"
+                            value={formData.maintenanceDue}
+                            onChange={e => handleChange('maintenanceDue', e.target.value)}
+                            className="col-span-3"
+                            required
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                        <Button type="submit" disabled={isProcessing} className="medical-gradient text-white">
+                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Guardar Cambios
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const EditLotDialog = ({
+    isOpen,
+    onOpenChange,
+    lot,
+    onSave,
+    isProcessing,
+    equipmentId
+}) => {
+    const [formData, setFormData] = useState({
+        lotNumber: '',
+        expirationDate: '',
+    });
+
+    useEffect(() => {
+        if (lot) {
+            setFormData({
+                lotNumber: lot.lotNumber || '',
+                expirationDate: lot.expirationDate ? lot.expirationDate.split('T')[0] : '',
+            });
+        }
+    }, [lot]);
+
+    const handleSave = () => {
+        onSave(equipmentId, lot.id, formData);
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Editar Lote de CC</DialogTitle>
+                    <DialogDescription>
+                        Modifique el número de lote y la fecha de expiración.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Número de Lote</label>
+                        <Input
+                            value={formData.lotNumber}
+                            onChange={(e) => setFormData({ ...formData, lotNumber: e.target.value })}
+                            placeholder="Ingrese número de lote..."
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Fecha de Expiración</label>
+                        <Input
+                            type="date"
+                            value={formData.expirationDate}
+                            onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSave} disabled={isProcessing} className="medical-gradient text-white">
+                        {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                        Guardar Cambios
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 // Lot Editing Component
 const EditableLot = ({ lot, equipment, onSave, isAdmin, dbUnits, isProcessing, availableParameters }) => {
     const [editableLot, setEditableLot] = useState(JSON.parse(JSON.stringify(lot)));
@@ -317,12 +537,34 @@ const EditableLot = ({ lot, equipment, onSave, isAdmin, dbUnits, isProcessing, a
         });
     };
 
+    const handleRemoveLevel = (levelName) => {
+        if (window.confirm(`¿Seguro que desea eliminar el nivel "${levelName}" y todos sus parámetros?`)) {
+            setEditableLot(prev => {
+                const newLot = JSON.parse(JSON.stringify(prev));
+                delete newLot.qc_params[levelName];
+                return newLot;
+            });
+        }
+    };
+
     return (
         <div className="space-y-6">
             {Object.entries(editableLot.qc_params).map(([level, params]) => (
                 <div key={level} className="p-4 border rounded-lg bg-gray-50/50">
                     <div className="flex justify-between items-center mb-3">
-                        <h5 className="font-semibold text-gray-800">{level}</h5>
+                        <div className="flex items-center gap-2">
+                            <h5 className="font-semibold text-gray-800">{level}</h5>
+                            {isAdmin && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => handleRemoveLevel(level)}
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </Button>
+                            )}
+                        </div>
                         {isAdmin && (
                             <Button variant="ghost" size="sm" onClick={() => handleAddParamToLevel(level)} className="text-blue-600">
                                 <Plus className="w-3 h-3 mr-1" /> Agregar Parámetro
@@ -417,7 +659,11 @@ const EditableLot = ({ lot, equipment, onSave, isAdmin, dbUnits, isProcessing, a
 };
 
 // Row Component for the main table
-const EquipmentRow = ({ eq, isAdmin, isExpanded, toggleExpand, onActivateLot, onAddLot, onUpdateLot, dbUnits, isProcessing, showLabName, availableParameters, canManageLots }) => {
+const EquipmentRow = ({
+    eq, isAdmin, isExpanded, toggleExpand, onActivateLot, onAddLot, onUpdateLot, onEdit,
+    dbUnits, isProcessing, showLabName, availableParameters, canManageLots,
+    onDeleteLot, onEditLot, onDeactivateLot
+}) => {
     const [newLotForm, setNewLotForm] = useState({
         lotNumber: '',
         expirationDate: '',
@@ -464,10 +710,17 @@ const EquipmentRow = ({ eq, isAdmin, isExpanded, toggleExpand, onActivateLot, on
                     }
                 </TableCell>
                 <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => toggleExpand(eq.id)}>
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        <span className="ml-2">Gestionar Lotes</span>
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                        {isAdmin && (
+                            <Button variant="ghost" size="sm" onClick={() => onEdit(eq)}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => toggleExpand(eq.id)}>
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            <span className="ml-2">Gestionar Lotes</span>
+                        </Button>
+                    </div>
                 </TableCell>
             </TableRow>
 
@@ -483,9 +736,48 @@ const EquipmentRow = ({ eq, isAdmin, isExpanded, toggleExpand, onActivateLot, on
                                         <Activity className="w-4 h-4 mr-2" /> Lote de QC Activo
                                     </h4>
                                     {eq.lots?.find(l => l.isActive) && (
-                                        <Badge variant="outline" className="bg-white">
-                                            {eq.lots.find(l => l.isActive).lotNumber}
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-white">
+                                                {eq.lots.find(l => l.isActive).lotNumber}
+                                            </Badge>
+                                            {canManageLots && (
+                                                <div className="flex gap-1 items-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 text-red-600 hover:text-white hover:bg-red-600 px-2 text-[10px] uppercase font-bold"
+                                                        onClick={() => {
+                                                            if (window.confirm('¿Seguro que desea desactivar este lote? No podrá cargar más controles hasta activar uno nuevo.')) {
+                                                                onDeactivateLot(eq.id);
+                                                            }
+                                                        }}
+                                                    >
+                                                        Desactivar
+                                                    </Button>
+                                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-gray-400 hover:text-blue-600"
+                                                        onClick={() => onEditLot(eq.id, eq.lots.find(l => l.isActive))}
+                                                    >
+                                                        <Pencil className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 text-gray-400 hover:text-red-500"
+                                                        onClick={() => {
+                                                            if (window.confirm('¿Seguro que desea eliminar este lote?')) {
+                                                                onDeleteLot(eq.id, eq.lots.find(l => l.isActive).id);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                                 <div className="p-4">
@@ -520,9 +812,40 @@ const EquipmentRow = ({ eq, isAdmin, isExpanded, toggleExpand, onActivateLot, on
                                                     <span className="font-medium mr-2">{lot.lotNumber}</span>
                                                     <span className="text-xs text-gray-500">Expira: {new Date(lot.expirationDate).toLocaleDateString('es-ES')}</span>
                                                 </div>
-                                                <Button size="sm" variant="outline" onClick={() => onActivateLot(eq.id, lot.id)} disabled={isProcessing || !canManageLots}>
-                                                    <Check className="w-3 h-3 mr-1" /> Activar
-                                                </Button>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => onActivateLot(eq.id, lot.id)}
+                                                        disabled={isProcessing || !canManageLots}
+                                                    >
+                                                        <Check className="w-3 h-3 mr-1" /> Activar
+                                                    </Button>
+                                                    {canManageLots && (
+                                                        <div className="flex gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-gray-400 hover:text-blue-600"
+                                                                onClick={() => onEditLot(eq.id, lot)}
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-gray-400 hover:text-red-500"
+                                                                onClick={() => {
+                                                                    if (window.confirm('¿Seguro que desea eliminar este lote?')) {
+                                                                        onDeleteLot(eq.id, lot.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -584,7 +907,11 @@ const QCSettingsPage = ({ isTab = false }) => {
         addEquipment,
         addLot,
         activateLot,
+        deactivateLot,
         updateLotParams,
+        updateEquipmentDetails,
+        deleteLot,
+        updateLotDetails,
         loading: qcContextLoading,
         equipmentTypes,
         laboratories,
@@ -598,7 +925,14 @@ const QCSettingsPage = ({ isTab = false }) => {
     const canManageLots = hasPermission(user, 'manage_lots');
     const [expandedEqId, setExpandedEqId] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingEquipment, setEditingEquipment] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Lot editing state
+    const [isEditLotModalOpen, setIsEditLotModalOpen] = useState(false);
+    const [editingLot, setEditingLot] = useState(null);
+    const [lotEquipmentId, setLotEquipmentId] = useState(null);
 
     // Database Data (Units)
     const [dbUnits, setDbUnits] = useState([]);
@@ -637,6 +971,41 @@ const QCSettingsPage = ({ isTab = false }) => {
         }
     };
 
+    const handleEditClick = (eq) => {
+        setEditingEquipment(eq);
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async (id, updatedData) => {
+        setIsProcessing(true);
+        try {
+            // Sanitize the payload: Select ONLY valid database columns
+            const cleanUpdates = {
+                name: updatedData.name,
+                model: updatedData.model,
+                serial: updatedData.serial,
+                maintenanceDue: updatedData.maintenanceDue,
+                // Ensure we send the IDs, not the joined objects
+                equipment_type_id: updatedData.typeId || updatedData.equipment_type_id,
+                laboratory_id: updatedData.laboratoryId || updatedData.laboratory_id || null
+            };
+            // Remove any undefined keys to avoid overriding with null unintentionally
+            Object.keys(cleanUpdates).forEach(key =>
+                cleanUpdates[key] === undefined && delete cleanUpdates[key]
+            );
+            await updateEquipmentDetails(id, cleanUpdates);
+
+            toast({ title: 'Guardado', description: 'Equipo actualizado correctamente.' });
+            setIsEditModalOpen(false);
+            setEditingEquipment(null);
+        } catch (err) {
+            console.error("Update error:", err);
+            toast({ title: 'Error', description: 'Error al actualizar el equipo.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleAddLot = async (eqId, lotData) => {
         if (!lotData.qc_params['Control Nivel 1']) {
             lotData.qc_params['Control Nivel 1'] = {};
@@ -669,9 +1038,51 @@ const QCSettingsPage = ({ isTab = false }) => {
         setIsProcessing(true);
         try {
             await updateLotParams(eqId, lotId, lotData);
-            toast({ title: 'Guardado', description: 'Parámetros de QC actualizados correctamente.' });
+            toast({ title: 'Éxito', description: 'Parámetros del lote actualizados.' });
         } catch (err) {
-            toast({ title: 'Error', description: 'Error al guardar parámetros.', variant: 'destructive' });
+            toast({ title: 'Error', description: 'Error al actualizar los parámetros.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleDeleteLot = async (eqId, lotId) => {
+        setIsProcessing(true);
+        try {
+            await deleteLot(eqId, lotId);
+            toast({ title: 'Lote Eliminado', description: 'El lote ha sido eliminado exitosamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'No se pudo eliminar el lote.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleEditLotClick = (eqId, lot) => {
+        setLotEquipmentId(eqId);
+        setEditingLot(lot);
+        setIsEditLotModalOpen(true);
+    };
+
+    const handleSaveLotEdit = async (eqId, lotId, lotData) => {
+        setIsProcessing(true);
+        try {
+            await updateLotDetails(eqId, lotId, lotData);
+            toast({ title: 'Lote Actualizado', description: 'Los detalles del lote han sido actualizados.' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'Error al actualizar el lote.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleDeactivateLot = async (eqId) => {
+        setIsProcessing(true);
+        try {
+            await deactivateLot(eqId);
+            toast({ title: 'Lote Desactivado', description: 'El lote ha sido desactivado correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'No se pudo desactivar el lote.', variant: 'destructive' });
         } finally {
             setIsProcessing(false);
         }
@@ -738,11 +1149,15 @@ const QCSettingsPage = ({ isTab = false }) => {
                                     onActivateLot={handleActivateLot}
                                     onAddLot={handleAddLot}
                                     onUpdateLot={handleUpdateLot}
+                                    onEdit={handleEditClick}
                                     dbUnits={dbUnits}
                                     isProcessing={isProcessing}
                                     showLabName={currentLabId === 'all'}
                                     availableParameters={parameters}
                                     canManageLots={canManageLots}
+                                    onDeleteLot={handleDeleteLot}
+                                    onEditLot={handleEditLotClick}
+                                    onDeactivateLot={handleDeactivateLot}
                                 />
                             ))
                         )}
@@ -759,6 +1174,25 @@ const QCSettingsPage = ({ isTab = false }) => {
                 equipmentTypes={equipmentTypes}
                 laboratories={laboratories}
                 currentLabId={currentLabId}
+            />
+
+            <EditEquipmentDialog
+                isOpen={isEditModalOpen}
+                onOpenChange={setIsEditModalOpen}
+                equipment={editingEquipment}
+                onSave={handleSaveEdit}
+                isProcessing={isProcessing}
+                equipmentTypes={equipmentTypes}
+                laboratories={laboratories}
+            />
+
+            <EditLotDialog
+                isOpen={isEditLotModalOpen}
+                onOpenChange={setIsEditLotModalOpen}
+                lot={editingLot}
+                onSave={handleSaveLotEdit}
+                isProcessing={isProcessing}
+                equipmentId={lotEquipmentId}
             />
         </div>
     );
