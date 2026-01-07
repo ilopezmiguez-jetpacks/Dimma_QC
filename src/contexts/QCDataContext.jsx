@@ -107,7 +107,8 @@ export const QCDataProvider = ({ children }) => {
             *,
             unit:units(name)
           `)
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .order('index', { ascending: true });
         if (paramsError) throw paramsError;
 
         // Flatten unit name
@@ -191,7 +192,8 @@ export const QCDataProvider = ({ children }) => {
     const { data: paramsData, error } = await supabase
       .from('parameters')
       .select(`*, unit:units(name)`)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('index', { ascending: true });
 
     if (!error && paramsData) {
       const formattedParams = paramsData.map(p => ({

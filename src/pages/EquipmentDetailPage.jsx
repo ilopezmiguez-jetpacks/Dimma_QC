@@ -32,18 +32,19 @@ const calculateStats = (data) => {
   return { mean, stdDev, cv };
 };
 
-const StatsTable = ({ reports, qcParams }) => {
+const StatsTable = ({ reports, qcParams, parameters }) => {
   const [isOpen, setIsOpen] = useState(true);
   const statsByParam = useMemo(() => {
     if (!qcParams) return {};
-    const params = Object.keys(qcParams);
     const results = {};
-    params.forEach(param => {
+    const relevantParams = parameters.filter(p => qcParams[p.name]);
+    relevantParams.forEach(p => {
+      const param = p.name;
       const values = reports.map(r => r.values[param]).filter(v => v !== undefined && v !== null);
       results[param] = calculateStats(values);
     });
     return results;
-  }, [reports, qcParams]);
+  }, [reports, qcParams, parameters]);
 
   if (!qcParams) return null;
 
@@ -66,15 +67,20 @@ const StatsTable = ({ reports, qcParams }) => {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(statsByParam).map(([param, stats]) => (
-                <tr key={param} className="border-b border-border">
-                  <td className="py-2 px-4 font-semibold">{param} ({qcParams[param]?.unit || ''})</td>
-                  <td className="py-2 px-4">{reports.map(r => r.values[param]).filter(v => v !== undefined).length}</td>
-                  <td className="py-2 px-4">{stats.mean.toFixed(2)}</td>
-                  <td className="py-2 px-4">{stats.stdDev.toFixed(2)}</td>
-                  <td className="py-2 px-4">{stats.cv.toFixed(2)}%</td>
-                </tr>
-              ))}
+              {parameters.filter(p => qcParams[p.name]).map(p => {
+                const param = p.name;
+                const stats = statsByParam[param];
+                if (!stats) return null;
+                return (
+                  <tr key={param} className="border-b border-border">
+                    <td className="py-2 px-4 font-semibold">{param} ({qcParams[param]?.unit || ''})</td>
+                    <td className="py-2 px-4">{reports.map(r => r.values[param]).filter(v => v !== undefined).length}</td>
+                    <td className="py-2 px-4">{stats.mean.toFixed(2)}</td>
+                    <td className="py-2 px-4">{stats.stdDev.toFixed(2)}</td>
+                    <td className="py-2 px-4">{stats.cv.toFixed(2)}%</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -85,7 +91,7 @@ const StatsTable = ({ reports, qcParams }) => {
 
 const EquipmentDetailPage = () => {
   const { equipmentId } = useParams();
-  const { equipment, addQCReport, updateEquipmentDetails, deleteEquipment, loading: contextLoading } = useQCData();
+  const { equipment, addQCReport, updateEquipmentDetails, deleteEquipment, parameters, loading: contextLoading } = useQCData();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -419,7 +425,9 @@ const EquipmentDetailPage = () => {
                   </div>
                   {selectedLevel && activeLot.qc_params[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel]).length > 0 ? (
                     <div className="space-y-3 pt-2">
-                      {Object.entries(activeLot.qc_params[selectedLevel]).map(([param, { mean, sd, unit }]) => {
+                      {parameters.filter(p => activeLot.qc_params[selectedLevel]?.[p.name]).map(p => {
+                        const param = p.name;
+                        const { mean, sd, unit } = activeLot.qc_params[selectedLevel][param];
                         const numMean = parseFloat(mean);
                         const numSd = parseFloat(sd);
                         return (
@@ -453,7 +461,7 @@ const EquipmentDetailPage = () => {
               </div>
             </div>
 
-            {selectedLevel && activeLot.qc_params[selectedLevel] && <StatsTable reports={equipmentReports} qcParams={activeLot.qc_params[selectedLevel]} />}
+            {selectedLevel && activeLot.qc_params[selectedLevel] && <StatsTable reports={equipmentReports} qcParams={activeLot.qc_params[selectedLevel]} parameters={parameters} />}
 
             <div className="medical-card rounded-xl p-6">
               <h2 className="text-xl font-bold text-foreground mb-4">Historial de Controles (Lote Actual)</h2>

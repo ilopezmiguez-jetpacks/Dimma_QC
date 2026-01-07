@@ -22,8 +22,8 @@ const StatisticsPage = () => {
   const [selectedLevel, setSelectedLevel] = useState('');
   const [selectedParam, setSelectedParam] = useState('');
   const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+    start: new Date(new Date().setDate(new Date().getDate() - 30)).toLocaleDateString('en-CA'),
+    end: new Date().toLocaleDateString('en-CA'),
   });
 
   const [fetchedReports, setFetchedReports] = useState([]);
@@ -39,10 +39,8 @@ const StatisticsPage = () => {
   const fetchReports = useCallback(async () => {
     if (!selectedEquipmentId) return;
     setLoadingReports(true);
-    const start = new Date(dateRange.start);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dateRange.end);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(`${dateRange.start}T00:00:00`);
+    const end = new Date(`${dateRange.end}T23:59:59.999`);
 
     try {
       const { data, error } = await supabase

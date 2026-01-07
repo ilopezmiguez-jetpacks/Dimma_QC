@@ -10,7 +10,7 @@ import { Save, AlertTriangle, CheckCircle, Sliders, ChevronDown } from 'lucide-r
 import { predefinedParams } from '@/lib/parameters';
 
 const LoadControlPage = () => {
-    const { equipment, addQCReport } = useQCData();
+    const { equipment, addQCReport, parameters } = useQCData();
     const { user } = useAuth();
     const { toast } = useToast();
     const location = useLocation();
@@ -186,7 +186,9 @@ const LoadControlPage = () => {
                             <div className="space-y-4">
                                 <h3 className="font-semibold text-lg">3. Ingresar Valores Medidos</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {Object.entries(formParams).map(([param, { mean, sd, unit }]) => {
+                                    {parameters.filter(p => formParams[p.name]).map(p => {
+                                        const param = p.name;
+                                        const { mean, sd, unit } = formParams[param];
                                         const numMean = parseFloat(mean);
                                         const numSd = parseFloat(sd);
                                         const lastValue = lastReport?.values?.[param];
