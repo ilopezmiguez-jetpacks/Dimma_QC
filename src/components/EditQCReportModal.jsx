@@ -48,7 +48,7 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
     setNewParams(newParams.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     let combinedValues = { ...values };
     let paramsToAddToLot = {};
     let allNewParamsAreValid = true;
@@ -75,23 +75,26 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
       return;
     }
 
+    // Note: updateLotParams might need adjustment in QCDataContext to handle new params per level
     if (Object.keys(paramsToAddToLot).length > 0) {
-      updateLotParams(report.equipmentId, report.lotNumber, report.level, paramsToAddToLot);
+      await updateLotParams(report.equipmentId, report.lotId, paramsToAddToLot);
     }
 
     const numericValues = Object.fromEntries(
       Object.entries(combinedValues).map(([k, v]) => [k, parseFloat(v) || 0])
     );
 
-    const updatedReport = updateQCReport(report.id, numericValues);
+    const updatedReport = await updateQCReport(report.id, numericValues);
 
     onClose();
 
-    toast({
-      title: 'Reporte Actualizado',
-      description: `El control del ${new Date(report.date).toLocaleDateString()} ha sido modificado.`,
-      variant: updatedReport.status === 'error' ? 'destructive' : 'default',
-    });
+    if (updatedReport) {
+      toast({
+        title: 'Reporte Actualizado',
+        description: `El control del ${new Date(report.date).toLocaleDateString()} ha sido modificado.`,
+        variant: updatedReport.status === 'error' ? 'destructive' : 'default',
+      });
+    }
   };
 
   return (

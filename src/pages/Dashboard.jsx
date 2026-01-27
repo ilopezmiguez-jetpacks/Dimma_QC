@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Calendar, BarChart3, Loader2, Check, Clock, Eye } from 'lucide-react';
+import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Calendar, BarChart3, Loader2, Check, Clock, Eye, Pencil } from 'lucide-react';
 import { useQCData } from '@/contexts/QCDataContext';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import EditQCReportModal from '@/components/EditQCReportModal';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const { equipment, validateQCReport } = useQCData();
@@ -34,12 +36,14 @@ const Dashboard = () => {
   const [loadingPending, setLoadingPending] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [reportToEdit, setReportToEdit] = useState(null);
 
   const role = user?.profile?.role || user?.user_metadata?.role;
   const isBiochemist = role === 'biochemist';
   const isAdmin = role === 'admin';
   const isTechnician = role === 'technician';
-  const canValidate = isAdmin || isBiochemist;
+  const canUserValidate = isAdmin || isBiochemist;
 
   const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -75,7 +79,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchPending = async () => {
-      if (!user || !canValidate) return;
+      if (!user || !canUserValidate) return;
       setLoadingPending(true);
       try {
         let query = supabase
@@ -102,11 +106,25 @@ const Dashboard = () => {
     };
 
     fetchPending();
-  }, [user, canValidate, isBiochemist]);
+  }, [user, canUserValidate, isBiochemist]);
 
   const handleViewReport = (report) => {
     setSelectedReport(report);
     setIsModalOpen(true);
+  };
+
+  const handleEditReport = (report) => {
+    // Enrich report with local IDs for the modal
+    const eq = equipment.find(e => e.id === report.equipment_id);
+    const lot = eq?.lots?.find(l => l.lotNumber === report.lot_number);
+
+    setReportToEdit({
+      ...report,
+      equipmentId: report.equipment_id,
+      lotNumber: report.lot_number,
+      lotId: lot?.id
+    });
+    setIsEditModalOpen(true);
   };
 
   const handleValidate = async (reportId) => {
@@ -227,7 +245,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {canValidate && (
+        {canUserValidate && (
           <div className="medical-card rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -252,7 +270,7 @@ const Dashboard = () => {
                       <TableHead>Fecha/Hora</TableHead>
                       <TableHead>Nivel</TableHead>
                       <TableHead className="text-center">Estado</TableHead>
-                      <TableHead className="text-right">Acción</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -289,27 +307,43 @@ const Dashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewReport(report);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 text-muted-foreground transition-colors"
+                              className="h-8 w-8 text-muted-foreground"
                               title="Ver detalles"
                             >
                               <Eye className="w-4 h-4" />
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditReport(report);
+                              }}
+                              className="h-8 w-8 text-blue-600"
+                              title="Corregir/Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleValidate(report.id);
                               }}
-                              className="bg-primary hover:bg-primary/90 text-white p-1.5 rounded-lg transition-colors flex items-center justify-center"
-                              title="Validar Control"
+                              disabled={report.status !== 'ok'}
+                              className={`h-8 medical-gradient text-white flex items-center justify-center ${report.status !== 'ok' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              title={report.status !== 'ok' ? "Corrija los valores antes de validar" : "Validar Control"}
                             >
-                              <Check className="w-4 h-4" />
-                              <span className="ml-1 text-xs">Validar</span>
-                            </button>
+                              <Check className="w-4 h-4 mr-1" />
+                              <span className="text-xs">Validar</span>
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -431,7 +465,9 @@ const Dashboard = () => {
             </button>
             <button
               onClick={() => handleValidate(selectedReport.id)}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center gap-2"
+              disabled={selectedReport?.status !== 'ok'}
+              className={`px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center gap-2 ${selectedReport?.status !== 'ok' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={selectedReport?.status !== 'ok' ? "Corrija los valores antes de validar" : ""}
             >
               <Check className="w-4 h-4" />
               Validar Reporte
@@ -439,6 +475,39 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditQCReportModal
+        report={reportToEdit}
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setReportToEdit(null);
+          // Refresh pending reports after edit
+          const fetchPending = async () => {
+            let query = supabase
+              .from('qc_reports')
+              .select(`
+                *,
+                equipment:equipment!inner(name, model, laboratory_id)
+              `)
+              .eq('is_validated', false)
+              .order('date', { ascending: false });
+
+            if (isBiochemist && user.profile?.laboratory_id) {
+              query = query.eq('equipment.laboratory_id', user.profile.laboratory_id);
+            }
+
+            const { data } = await query;
+            setPendingReports(data || []);
+          };
+          fetchPending();
+        }}
+        qcParams={
+          reportToEdit && equipment.find(e => e.id === reportToEdit.equipment_id)
+            ?.lots?.find(l => l.lotNumber === reportToEdit.lot_number)
+            ?.qc_params?.[reportToEdit.level]
+        }
+      />
     </>
   );
 };

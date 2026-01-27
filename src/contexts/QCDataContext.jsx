@@ -310,6 +310,116 @@ export const QCDataProvider = ({ children }) => {
     }
   };
 
+  const updateQCReport = async (reportId, newValues) => {
+    try {
+      // 1. Get current report context
+      const { data: currentReport, error: fetchError } = await supabase
+        .from('qc_reports')
+        .select('*')
+        .eq('id', reportId)
+        .single();
+
+      if (fetchError || !currentReport) throw new Error("Reporte no encontrado");
+
+      const { equipment_id: equipmentId, lot_number: lotNumber, level } = currentReport;
+
+      // 2. Filter new values (ensure they are numeric and non-empty)
+      const filteredValues = Object.fromEntries(
+        Object.entries(newValues).filter(([, value]) =>
+          value !== null && value !== '' && !isNaN(parseFloat(value))
+        )
+      );
+
+      // 3. Fetch History (last 20 excluding current)
+      const { data: historyData } = await supabase
+        .from('qc_reports')
+        .select('*')
+        .eq('equipment_id', equipmentId)
+        .eq('lot_number', lotNumber)
+        .eq('level', level)
+        .neq('id', reportId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const historyOrdered = (historyData || []).map(r => ({
+        ...r,
+        values: r.values
+      })).reverse();
+
+      // 4. Get QC Parameters for analysis
+      const equipmentToUpdate = equipment.find(e => e.id === equipmentId);
+      if (!equipmentToUpdate) return null;
+
+      const activeLot = equipmentToUpdate.lots.find(l => l.lotNumber === lotNumber);
+      if (!activeLot) return null;
+
+      const qcParamsForLevel = activeLot.qc_params[level];
+      let finalStatus = 'ok';
+      const allTriggeredRules = [];
+
+      // 5. Apply Westgard Rules per parameter
+      for (const param in filteredValues) {
+        const value = parseFloat(filteredValues[param]);
+        const qcParamsForParam = qcParamsForLevel?.[param];
+
+        // Prepare history for this parameter
+        const history = historyOrdered.map(r => r.values[param]).filter(v => v !== undefined);
+
+        const { status, triggeredRules } = applyWestgardRules(value, history, qcParamsForParam);
+
+        if (triggeredRules.length > 0) {
+          allTriggeredRules.push(...triggeredRules.map(rule => `${rule} para ${param}`));
+        }
+
+        if (status === 'error') finalStatus = 'error';
+        else if (status === 'warning' && finalStatus !== 'error') finalStatus = 'warning';
+      }
+
+      // 6. Update Database
+      const { data: updatedReport, error: updateError } = await supabase
+        .from('qc_reports')
+        .update({
+          values: filteredValues,
+          status: finalStatus,
+          westgard_rules: allTriggeredRules
+        })
+        .eq('id', reportId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // 7. Update Equipment Overall Status
+      await supabase
+        .from('equipment')
+        .update({ status: finalStatus })
+        .eq('id', equipmentId);
+
+      // 8. Update Local State immediately
+      setEquipment(prev => prev.map(eq =>
+        eq.id === equipmentId
+          ? { ...eq, status: finalStatus }
+          : eq
+      ));
+
+      return {
+        ...updatedReport,
+        equipmentId: updatedReport.equipment_id,
+        lotNumber: updatedReport.lot_number,
+        westgardRules: updatedReport.westgard_rules
+      };
+
+    } catch (err) {
+      console.error("Error updating QC report:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el reporte de QC.",
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
   const validateQCReport = async (reportId, userId) => {
     try {
       const { error } = await supabase
@@ -644,6 +754,7 @@ export const QCDataProvider = ({ children }) => {
     setCurrentLabId,
     loading,
     addQCReport,
+    updateQCReport,
     validateQCReport,
     addEquipment,
     addLot,

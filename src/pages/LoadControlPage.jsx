@@ -106,7 +106,7 @@ const LoadControlPage = () => {
     };
 
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         const currentLevelData = allLevelsData[selectedLevel] || {};
@@ -133,14 +133,22 @@ const LoadControlPage = () => {
             dailyDeviationThreshold: currentEquipment.dailyDeviationThreshold || 2,
         };
 
-        const newReport = addQCReport(report);
+        const newReport = await addQCReport(report);
 
         if (newReport) {
-            toast({
-                title: "Reporte QC Guardado",
-                description: `El control para ${currentEquipment.name} ha sido registrado.`,
-                variant: newReport.status === 'error' ? 'destructive' : 'default',
-            });
+            if (newReport.status === 'ok') {
+                toast({
+                    title: "Reporte QC Guardado",
+                    description: `El control para ${currentEquipment.name} ha sido registrado.`,
+                    variant: 'default',
+                });
+            } else if (newReport.status === 'warning' || newReport.status === 'error') {
+                toast({
+                    title: "Control saved with Errors",
+                    description: "Validation is blocked until corrected.",
+                    variant: 'destructive',
+                });
+            }
             // Clear only the current level's data, preserving other levels
             setAllLevelsData(prev => ({ ...prev, [selectedLevel]: {} }));
         } else {
