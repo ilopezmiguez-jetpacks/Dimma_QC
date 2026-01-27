@@ -662,13 +662,16 @@ const EditableLot = ({ lot, equipment, onSave, isAdmin, dbUnits, isProcessing, a
 const EquipmentRow = ({
     eq, isAdmin, isExpanded, toggleExpand, onActivateLot, onAddLot, onUpdateLot, onEdit,
     dbUnits, isProcessing, showLabName, availableParameters, canManageLots,
-    onDeleteLot, onEditLot, onDeactivateLot
+    onDeleteLot, onEditLot, onDeactivateLot, onDeactivateSpecificLot
 }) => {
     const [newLotForm, setNewLotForm] = useState({
         lotNumber: '',
         expirationDate: '',
         qc_params: { 'Control Nivel 1': {} }
     });
+
+    const activeLots = eq.lots?.filter(l => l.isActive) || [];
+    const inactiveLots = eq.lots?.filter(l => !l.isActive) || [];
 
     const handleNewLotSubmit = (e) => {
         e.preventDefault();
@@ -729,84 +732,98 @@ const EquipmentRow = ({
                     <TableCell colSpan={showLabName ? 7 : 6} className="p-0">
                         <div className="p-6 space-y-6 animate-in slide-in-from-top-2 duration-200">
 
-                            {/* Active Lot Section */}
+                            {/* Active Lots Section */}
                             <div className="border rounded-lg bg-white overflow-hidden shadow-sm">
-                                <div className="bg-green-50 px-4 py-3 border-b flex justify-between items-center">
+                                <div className="bg-green-50 px-4 py-3 border-b">
                                     <h4 className="font-semibold text-green-800 flex items-center">
-                                        <Activity className="w-4 h-4 mr-2" /> Lote de QC Activo
+                                        <Activity className="w-4 h-4 mr-2" /> Lotes Activos
                                     </h4>
-                                    {eq.lots?.find(l => l.isActive) && (
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-white">
-                                                {eq.lots.find(l => l.isActive).lotNumber}
-                                            </Badge>
-                                            {canManageLots && (
-                                                <div className="flex gap-1 items-center">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-7 text-red-600 hover:text-white hover:bg-red-600 px-2 text-[10px] uppercase font-bold"
-                                                        onClick={() => {
-                                                            if (window.confirm('¿Seguro que desea desactivar este lote? No podrá cargar más controles hasta activar uno nuevo.')) {
-                                                                onDeactivateLot(eq.id);
-                                                            }
-                                                        }}
-                                                    >
-                                                        Desactivar
-                                                    </Button>
-                                                    <div className="h-4 w-px bg-gray-300 mx-1" />
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-gray-400 hover:text-blue-600"
-                                                        onClick={() => onEditLot(eq.id, eq.lots.find(l => l.isActive))}
-                                                    >
-                                                        <Pencil className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6 text-gray-400 hover:text-red-500"
-                                                        onClick={() => {
-                                                            if (window.confirm('¿Seguro que desea eliminar este lote?')) {
-                                                                onDeleteLot(eq.id, eq.lots.find(l => l.isActive).id);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="p-4">
-                                    {eq.lots?.find(l => l.isActive) ? (
-                                        <EditableLot
-                                            lot={eq.lots.find(l => l.isActive)}
-                                            equipment={eq}
-                                            onSave={onUpdateLot}
-                                            isAdmin={canManageLots}
-                                            dbUnits={dbUnits}
-                                            isProcessing={isProcessing}
-                                            availableParameters={availableParameters}
-                                        />
+                                    {activeLots.length > 0 ? (
+                                        <div className="space-y-6">
+                                            {activeLots.map((lot, index) => (
+                                                <div key={lot.id}>
+                                                    {index > 0 && <hr className="my-6 border-gray-200" />}
+                                                    <div className="border rounded-lg overflow-hidden">
+                                                        <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className="bg-white">
+                                                                    {lot.lotNumber}
+                                                                </Badge>
+                                                                <span className="text-xs text-gray-500">
+                                                                    Expira: {new Date(lot.expirationDate).toLocaleDateString('es-ES')}
+                                                                </span>
+                                                            </div>
+                                                            {canManageLots && (
+                                                                <div className="flex gap-1 items-center">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-7 text-red-600 hover:text-white hover:bg-red-600 px-2 text-[10px] uppercase font-bold"
+                                                                        onClick={() => {
+                                                                            if (window.confirm('¿Seguro que desea desactivar este lote?')) {
+                                                                                onDeactivateSpecificLot(eq.id, lot.id);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Desactivar
+                                                                    </Button>
+                                                                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 text-gray-400 hover:text-blue-600"
+                                                                        onClick={() => onEditLot(eq.id, lot)}
+                                                                    >
+                                                                        <Pencil className="h-3 w-3" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 text-gray-400 hover:text-red-500"
+                                                                        onClick={() => {
+                                                                            if (window.confirm('¿Seguro que desea eliminar este lote?')) {
+                                                                                onDeleteLot(eq.id, lot.id);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="p-4">
+                                                            <EditableLot
+                                                                lot={lot}
+                                                                equipment={eq}
+                                                                onSave={onUpdateLot}
+                                                                isAdmin={canManageLots}
+                                                                dbUnits={dbUnits}
+                                                                isProcessing={isProcessing}
+                                                                availableParameters={availableParameters}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     ) : (
                                         <div className="text-center py-8 text-gray-500">
-                                            No hay lote activo seleccionado. Por favor active un lote abajo o cree uno nuevo.
+                                            No hay lotes activos. Por favor active un lote abajo o cree uno nuevo.
                                         </div>
                                     )}
                                 </div>
                             </div>
 
                             {/* Inactive Lots List */}
-                            {eq.lots?.filter(l => !l.isActive).length > 0 && (
+                            {inactiveLots.length > 0 && (
                                 <div className="border rounded-lg bg-white overflow-hidden shadow-sm">
                                     <div className="bg-gray-50 px-4 py-3 border-b">
                                         <h4 className="font-semibold text-gray-700">Lotes Inactivos</h4>
                                     </div>
                                     <div className="divide-y">
-                                        {eq.lots.filter(l => !l.isActive).map(lot => (
+                                        {inactiveLots.map(lot => (
                                             <div key={lot.id} className="p-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                                 <div>
                                                     <span className="font-medium mr-2">{lot.lotNumber}</span>
@@ -908,6 +925,7 @@ const QCSettingsPage = ({ isTab = false }) => {
         addLot,
         activateLot,
         deactivateLot,
+        deactivateSpecificLot,
         updateLotParams,
         updateEquipmentDetails,
         deleteLot,
@@ -1088,6 +1106,18 @@ const QCSettingsPage = ({ isTab = false }) => {
         }
     };
 
+    const handleDeactivateSpecificLot = async (eqId, lotId) => {
+        setIsProcessing(true);
+        try {
+            await deactivateSpecificLot(eqId, lotId);
+            toast({ title: 'Lote Desactivado', description: 'El lote específico ha sido desactivado correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: 'No se pudo desactivar el lote.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const toggleExpand = (id) => {
         setExpandedEqId(prev => prev === id ? null : id);
     };
@@ -1158,6 +1188,7 @@ const QCSettingsPage = ({ isTab = false }) => {
                                     onDeleteLot={handleDeleteLot}
                                     onEditLot={handleEditLotClick}
                                     onDeactivateLot={handleDeactivateLot}
+                                    onDeactivateSpecificLot={handleDeactivateSpecificLot}
                                 />
                             ))
                         )}

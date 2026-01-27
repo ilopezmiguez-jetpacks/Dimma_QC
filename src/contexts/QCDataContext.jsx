@@ -443,13 +443,14 @@ export const QCDataProvider = ({ children }) => {
 
   const activateLot = async (equipmentId, lotIdToActivate) => {
     try {
-      await supabase.from('control_lots').update({ is_active: false }).eq('equipment_id', equipmentId);
       const { error } = await supabase.from('control_lots').update({ is_active: true }).eq('id', lotIdToActivate);
       if (error) throw error;
 
       setEquipment(prev => prev.map(eq => {
         if (eq.id === equipmentId) {
-          const updatedLots = eq.lots.map(lot => ({ ...lot, isActive: lot.id === lotIdToActivate }));
+          const updatedLots = eq.lots.map(lot =>
+            lot.id === lotIdToActivate ? { ...lot, isActive: true } : lot
+          );
           return { ...eq, lots: updatedLots };
         }
         return eq;
@@ -606,6 +607,32 @@ export const QCDataProvider = ({ children }) => {
     }
   };
 
+  const deactivateSpecificLot = async (equipmentId, lotId) => {
+    try {
+      const { error } = await supabase
+        .from('control_lots')
+        .update({ is_active: false })
+        .eq('id', lotId);
+
+      if (error) throw error;
+
+      setEquipment(prev => prev.map(eq => {
+        if (eq.id === equipmentId) {
+          return {
+            ...eq,
+            lots: (eq.lots || []).map(l =>
+              l.id === lotId ? { ...l, isActive: false } : l
+            )
+          };
+        }
+        return eq;
+      }));
+    } catch (err) {
+      console.error("Error deactivating specific lot:", err);
+      throw err;
+    }
+  };
+
   const value = {
     equipment,
     alarms,
@@ -622,6 +649,7 @@ export const QCDataProvider = ({ children }) => {
     addLot,
     activateLot,
     deactivateLot,
+    deactivateSpecificLot,
     updateLotParams,
     updateEquipmentDetails,
     deleteEquipment,

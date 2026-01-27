@@ -97,8 +97,9 @@ const EquipmentDetailPage = () => {
   const navigate = useNavigate();
 
   const currentEquipment = useMemo(() => equipment.find(e => e.id === equipmentId), [equipment, equipmentId]);
-  const activeLot = useMemo(() => currentEquipment?.lots?.find(l => l.isActive), [currentEquipment]);
+  const activeLots = useMemo(() => currentEquipment?.lots?.filter(l => l.isActive) || [], [currentEquipment]);
 
+  const [selectedLotId, setSelectedLotId] = useState('');
   const [reports, setReports] = useState([]); // Local state for reports
   const [loadingReports, setLoadingReports] = useState(true);
 
@@ -110,6 +111,8 @@ const EquipmentDetailPage = () => {
   const [editingReport, setEditingReport] = useState(null);
   const [dailyDeviationThreshold, setDailyDeviationThreshold] = useState(2);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const activeLot = useMemo(() => activeLots.find(l => l.id === selectedLotId), [activeLots, selectedLotId]);
 
   // Fetch Reports Effect
   useEffect(() => {
@@ -142,6 +145,21 @@ const EquipmentDetailPage = () => {
 
     fetchReports();
   }, [equipmentId, toast]);
+
+  // Auto-select lot if there's only one active lot
+  useEffect(() => {
+    if (activeLots.length === 1) {
+      setSelectedLotId(activeLots[0].id);
+    } else if (activeLots.length > 1 && !selectedLotId) {
+      // Don't auto-select if multiple lots exist, but keep current selection if valid
+      const isCurrentValid = activeLots.some(l => l.id === selectedLotId);
+      if (!isCurrentValid) {
+        setSelectedLotId('');
+      }
+    } else if (activeLots.length === 0) {
+      setSelectedLotId('');
+    }
+  }, [activeLots, selectedLotId]);
 
   useEffect(() => {
     if (activeLot && activeLot.qc_params) {
@@ -294,15 +312,33 @@ const EquipmentDetailPage = () => {
             <div>
               <h1 className="text-2xl font-bold text-foreground">{currentEquipment.name}</h1>
               <p className="text-muted-foreground">{currentEquipment.model} (S/N: {currentEquipment.serial})</p>
-              <div className="flex items-center gap-4 mt-2">
+              <div className="flex items-center gap-4 mt-2 flex-wrap">
                 <div className={`flex items-center gap-2 font-semibold ${statusInfo.color}`}>
                   <StatusIcon className="w-5 h-5" />
                   <span>Estado: {statusInfo.text}</span>
                 </div>
-                {activeLot ? (
-                  <div className="text-sm text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-                    Lote Activo: <span className="font-bold text-foreground">{activeLot.lotNumber}</span> (Expira: {new Date(activeLot.expirationDate).toLocaleDateString('es-ES')})
-                  </div>
+                {activeLots.length > 0 ? (
+                  activeLots.length === 1 ? (
+                    <div className="text-sm text-muted-foreground bg-secondary px-2 py-1 rounded-md">
+                      Lote Activo: <span className="font-bold text-foreground">{activeLots[0].lotNumber}</span> (Expira: {new Date(activeLots[0].expirationDate).toLocaleDateString('es-ES')})
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium">Lote Activo:</label>
+                      <select
+                        value={selectedLotId}
+                        onChange={(e) => setSelectedLotId(e.target.value)}
+                        className="p-2 border border-border rounded-md text-sm bg-white"
+                      >
+                        <option value="">-- Seleccione un lote --</option>
+                        {activeLots.map(lot => (
+                          <option key={lot.id} value={lot.id}>
+                            {lot.lotNumber} (Expira: {new Date(lot.expirationDate).toLocaleDateString('es-ES')})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
                 ) : (
                   <div className="text-sm text-red-600 bg-red-100 px-2 py-1 rounded-md">
                     Sin lote activo.
@@ -357,7 +393,7 @@ const EquipmentDetailPage = () => {
           )}
         </div>
 
-        {!activeLot && (
+        {activeLots.length === 0 && (
           <div className="medical-card rounded-xl p-8 text-center">
             <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-foreground">Sin Lote Activo</h2>
@@ -370,7 +406,15 @@ const EquipmentDetailPage = () => {
           </div>
         )}
 
-        {activeLot && (
+        {activeLots.length > 0 && !selectedLotId && activeLots.length > 1 && (
+          <div className="medical-card rounded-xl p-8 text-center">
+            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-foreground">Seleccione un Lote</h2>
+            <p className="text-muted-foreground mt-2">Este equipo tiene múltiples lotes activos. Por favor seleccione uno en el selector de arriba para continuar.</p>
+          </div>
+        )}
+
+        {activeLot && selectedLotId && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 medical-card rounded-xl p-6">

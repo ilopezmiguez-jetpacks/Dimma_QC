@@ -16,13 +16,15 @@ const LoadControlPage = () => {
     const location = useLocation();
 
     const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
+    const [selectedLotId, setSelectedLotId] = useState('');
     const [selectedLevel, setSelectedLevel] = useState('');
     const [formParams, setFormParams] = useState({});
-    const [inputValues, setInputValues] = useState({});
+    const [allLevelsData, setAllLevelsData] = useState({});
     const [lastReport, setLastReport] = useState(null);
 
     const currentEquipment = useMemo(() => equipment.find(e => e.id === selectedEquipmentId), [equipment, selectedEquipmentId]);
-    const activeLot = useMemo(() => currentEquipment?.lots?.find(l => l.isActive), [currentEquipment]);
+    const activeLots = useMemo(() => currentEquipment?.lots?.filter(l => l.isActive) || [], [currentEquipment]);
+    const activeLot = useMemo(() => activeLots.find(l => l.id === selectedLotId), [activeLots, selectedLotId]);
 
     useEffect(() => {
         const fetchLastReport = async () => {
@@ -54,6 +56,19 @@ const LoadControlPage = () => {
         }
     }, [location.search, equipment]);
 
+    // Auto-select lot if there's only one active lot
+    useEffect(() => {
+        if (activeLots.length === 1) {
+            setSelectedLotId(activeLots[0].id);
+        } else if (activeLots.length > 1) {
+            // If multiple lots, reset selection to force user to choose
+            setSelectedLotId('');
+        } else {
+            // No active lots
+            setSelectedLotId('');
+        }
+    }, [activeLots]);
+
     useEffect(() => {
         if (activeLot && activeLot.qc_params) {
             const firstLevel = Object.keys(activeLot.qc_params)[0] || '';
@@ -63,29 +78,41 @@ const LoadControlPage = () => {
         }
     }, [activeLot]);
 
+    // Effect A: Update form schema when level changes (does NOT reset data)
     useEffect(() => {
-        if (currentEquipment && selectedLevel) {
+        if (currentEquipment && selectedLevel && activeLot) {
             const lotParams = activeLot?.qc_params?.[selectedLevel] || {};
             const equipmentTypeParams = predefinedParams[currentEquipment.type]?.params || {};
             const combinedParams = { ...equipmentTypeParams, ...lotParams };
             setFormParams(combinedParams);
-            setInputValues({});
         } else {
             setFormParams({});
-            setInputValues({});
         }
     }, [currentEquipment, selectedLevel, activeLot]);
 
+    // Effect B: Reset all data when equipment or lot changes
+    useEffect(() => {
+        setAllLevelsData({});
+    }, [currentEquipment?.id, activeLot?.lotNumber]);
+
     const handleInputChange = (param, value) => {
-        setInputValues(prev => ({ ...prev, [param]: value }));
+        setAllLevelsData(prev => ({
+            ...prev,
+            [selectedLevel]: {
+                ...prev[selectedLevel],
+                [param]: value
+            }
+        }));
     };
 
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Validation: Every parameter in formParams must have a non-empty value in inputValues
-        const missingFields = Object.keys(formParams).some(param => !inputValues[param] || inputValues[param].toString().trim() === '');
+        const currentLevelData = allLevelsData[selectedLevel] || {};
+
+        // Validation: Every parameter in formParams must have a non-empty value in current level data
+        const missingFields = Object.keys(formParams).some(param => !currentLevelData[param] || currentLevelData[param].toString().trim() === '');
 
         if (missingFields) {
             toast({
@@ -102,7 +129,7 @@ const LoadControlPage = () => {
             date: new Date().toISOString(),
             technician: user?.user_metadata?.full_name || 'Usuario Anónimo',
             level: selectedLevel,
-            values: Object.fromEntries(Object.entries(inputValues).map(([k, v]) => [k, parseFloat(v) || null])),
+            values: Object.fromEntries(Object.entries(currentLevelData).map(([k, v]) => [k, parseFloat(v) || null])),
             dailyDeviationThreshold: currentEquipment.dailyDeviationThreshold || 2,
         };
 
@@ -114,7 +141,8 @@ const LoadControlPage = () => {
                 description: `El control para ${currentEquipment.name} ha sido registrado.`,
                 variant: newReport.status === 'error' ? 'destructive' : 'default',
             });
-            setInputValues({});
+            // Clear only the current level's data, preserving other levels
+            setAllLevelsData(prev => ({ ...prev, [selectedLevel]: {} }));
         } else {
             toast({
                 title: "Error al Guardar",
@@ -154,13 +182,43 @@ const LoadControlPage = () => {
                         </div>
                     </div>
 
+                    {currentEquipment && activeLots.length > 0 && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">2. Seleccionar Lote</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedLotId}
+                                    onChange={e => setSelectedLotId(e.target.value)}
+                                    className="w-full p-3 border rounded-md appearance-none"
+                                >
+                                    {activeLots.length > 1 && <option value="">-- Seleccione un lote --</option>}
+                                    {activeLots.map(lot => (
+                                        <option key={lot.id} value={lot.id}>
+                                            {lot.lotNumber} (Vence: {new Date(lot.expirationDate).toLocaleDateString('es-ES')})
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                            </div>
+                        </div>
+                    )}
+
                     {currentEquipment && (
                         <div>
-                            {activeLot ? (
-                                <div className="flex items-center gap-2 text-sm bg-green-100 text-green-800 p-2 rounded-md">
-                                    <CheckCircle className="w-5 h-5" />
-                                    <span>Lote Activo: <span className="font-bold">{activeLot.lotNumber}</span> (Vence: {new Date(activeLot.expirationDate).toLocaleDateString('en-CA')})</span>
-                                </div>
+                            {activeLots.length > 0 ? (
+                                selectedLotId && activeLot ? (
+                                    <div className="flex items-center gap-2 text-sm bg-green-100 text-green-800 p-2 rounded-md">
+                                        <CheckCircle className="w-5 h-5" />
+                                        <span>Lote Seleccionado: <span className="font-bold">{activeLot.lotNumber}</span> (Vence: {new Date(activeLot.expirationDate).toLocaleDateString('es-ES')})</span>
+                                    </div>
+                                ) : (
+                                    activeLots.length > 1 && (
+                                        <div className="flex items-center gap-2 text-sm bg-yellow-100 text-yellow-800 p-2 rounded-md">
+                                            <AlertTriangle className="w-5 h-5" />
+                                            <span>Por favor seleccione un lote para continuar.</span>
+                                        </div>
+                                    )
+                                )
                             ) : (
                                 <div className="flex items-center gap-2 text-sm bg-red-100 text-red-800 p-2 rounded-md">
                                     <AlertTriangle className="w-5 h-5" />
@@ -171,10 +229,10 @@ const LoadControlPage = () => {
                     )}
                 </div>
 
-                {activeLot && (
+                {activeLot && selectedLotId && (
                     <form onSubmit={handleSubmit} className="medical-card rounded-xl p-6 space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">2. Seleccionar Nivel de Control</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">3. Seleccionar Nivel de Control</label>
                             <div className="flex flex-wrap gap-2">
                                 {Object.keys(activeLot.qc_params).map(level => (
                                     <Button key={level} type="button" variant={selectedLevel === level ? 'default' : 'outline'} onClick={() => setSelectedLevel(level)}>{level}</Button>
@@ -184,7 +242,7 @@ const LoadControlPage = () => {
 
                         {selectedLevel ? (
                             <div className="space-y-4">
-                                <h3 className="font-semibold text-lg">3. Ingresar Valores Medidos</h3>
+                                <h3 className="font-semibold text-lg">4. Ingresar Valores Medidos</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {parameters.filter(p => formParams[p.name]).map(p => {
                                         const param = p.name;
@@ -192,6 +250,7 @@ const LoadControlPage = () => {
                                         const numMean = parseFloat(mean);
                                         const numSd = parseFloat(sd);
                                         const lastValue = lastReport?.values?.[param];
+                                        const currentLevelData = allLevelsData[selectedLevel] || {};
                                         return (
                                             <div key={param} className="relative group">
                                                 <label className="block text-sm font-medium text-gray-700">{param} <span className="text-gray-500">({unit})</span></label>
@@ -199,7 +258,7 @@ const LoadControlPage = () => {
                                                     Rango 2SD: {(!isNaN(numMean) && !isNaN(numSd) && numSd > 0) ? `${(numMean - 2 * numSd).toFixed(2)} - ${(numMean + 2 * numSd).toFixed(2)}` : 'N/A'}
                                                     {lastValue !== undefined && ` | Último: ${lastValue}`}
                                                 </p>
-                                                <input type="number" step="any" value={inputValues[param] || ''} onChange={(e) => handleInputChange(param, e.target.value)} className="mt-1 w-full p-2 border border-border rounded-md" placeholder={`Valor para ${param}`} />
+                                                <input type="number" step="any" value={currentLevelData[param] || ''} onChange={(e) => handleInputChange(param, e.target.value)} className="mt-1 w-full p-2 border border-border rounded-md" placeholder={`Valor para ${param}`} />
                                             </div>
                                         );
                                     })}
