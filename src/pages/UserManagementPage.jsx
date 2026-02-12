@@ -36,7 +36,6 @@ const UserManagementPage = () => {
     password: '',
     role: 'technician',
     laboratoryId: '',
-    fullName: ''
   });
 
   const { user: currentUser, session } = useAuth();

@@ -39,7 +39,7 @@ const Dashboard = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [reportToEdit, setReportToEdit] = useState(null);
 
-  const role = user?.profile?.role || user?.user_metadata?.role;
+  const role = user?.role;
   const isBiochemist = role === 'biochemist';
   const isAdmin = role === 'admin';
   const isTechnician = role === 'technician';

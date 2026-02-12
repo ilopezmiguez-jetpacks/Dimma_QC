@@ -17,11 +17,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         return <Navigate to="/login" replace />;
     }
 
-    // Safely access role
-    const role = user.user_metadata?.role;
-
-    // Check if user is admin (consolidated logic: no more superadmin)
-    const isAdmin = role === 'admin';
+    const isAdmin = user.role === 'admin';
 
     if (adminOnly && !isAdmin) {
         return <Navigate to="/" replace />;

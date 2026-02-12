@@ -83,7 +83,7 @@ export const QCDataProvider = ({ children }) => {
         setLaboratories(labs || []);
 
         // Determine current Lab context
-        const isAdmin = user.user_metadata?.role === 'admin';
+        const isAdmin = user.role === 'admin';
 
         if (!isAdmin && profile?.laboratory_id) {
           setCurrentLabId(profile.laboratory_id); // Lock to assigned lab

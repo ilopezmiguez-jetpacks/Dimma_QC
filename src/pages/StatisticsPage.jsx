@@ -3,15 +3,13 @@ import { Helmet } from 'react-helmet';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useQCData } from '@/contexts/QCDataContext';
-import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { AlertTriangle, Repeat, Wrench, Settings2, Sliders, Loader2, RefreshCw } from 'lucide-react';
+import { Sliders, Loader2, RefreshCw } from 'lucide-react';
 
 const StatisticsPage = () => {
-  const { equipment, alarms, resolveAlarm } = useQCData(); // Removed qcReports
-  const { user } = useAuth();
+  const { equipment } = useQCData();
   const { toast } = useToast();
 
   const [selectedEquipmentId, setSelectedEquipmentId] = useState(equipment[0]?.id || '');
@@ -112,16 +110,6 @@ const StatisticsPage = () => {
 
   const qcParamsForChart = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
 
-  const pendingAlarms = useMemo(() => alarms.filter(a => a.status === 'pending'), [alarms]);
-
-  const handleResolveAlarm = (alarmId, action) => {
-    resolveAlarm(alarmId, action);
-    toast({
-      title: "Alarma Gestionada",
-      description: `La alarma ha sido marcada como resuelta con la acción: ${action}.`,
-    });
-  };
-
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -152,31 +140,6 @@ const StatisticsPage = () => {
             Actualizar
           </Button>
         </motion.div>
-
-        {user?.user_metadata?.role === 'admin' && pendingAlarms.length > 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="medical-card rounded-xl p-6 bg-yellow-50 border-yellow-300">
-            <h2 className="text-xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
-              <AlertTriangle />
-              Alarmas Diarias Pendientes
-            </h2>
-            <div className="space-y-4 max-h-60 overflow-y-auto">
-              {pendingAlarms.map(alarm => (
-                <div key={alarm.id} className="p-3 bg-white rounded-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800">{equipment.find(e => e.id === alarm.equipmentId)?.name}</p>
-                    <p className="text-sm text-gray-600">{alarm.message}</p>
-                    <p className="text-xs text-gray-400">{new Date(alarm.date).toLocaleString('en-US')}</p>
-                  </div>
-                  <div className="flex gap-2 mt-2 md:mt-0">
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Repeat Control')}><Repeat className="w-4 h-4 mr-1" /> Repetir</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Adjust Factors')}><Settings2 className="w-4 h-4 mr-1" /> Ajustar</Button>
-                    <Button size="sm" variant="outline" onClick={() => handleResolveAlarm(alarm.id, 'Request Technical Service')}><Wrench className="w-4 h-4 mr-1" /> Servicio Técnico</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="medical-card rounded-xl p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

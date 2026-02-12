@@ -35,7 +35,8 @@ export const AuthProvider = ({ children }) => {
     const authUser = currentSession?.user || null;
     if (authUser) {
       const profile = await fetchUserProfile(authUser);
-      setUser({ ...authUser, profile: profile || null });
+      const role = profile?.role || authUser.user_metadata?.role || null;
+      setUser({ ...authUser, profile: profile || null, role });
     } else {
       setUser(null);
     }

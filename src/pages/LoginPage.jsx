@@ -29,7 +29,7 @@ const ForgotPasswordForm = () => {
     setLoading(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/login`,
     });
 
     setLoading(false);
@@ -97,7 +97,7 @@ const ForgotPasswordForm = () => {
 };
 
 const LoginPage = () => {
-  const [credentials, setCredentials] = useState({ email: 'admin@qclab.com', password: 'password' });
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, signIn } = useAuth();
