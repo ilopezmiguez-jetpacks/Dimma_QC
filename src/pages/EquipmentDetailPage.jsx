@@ -24,12 +24,19 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const calculateStats = (data) => {
-  const n = data.length;
-  if (n === 0) return { mean: 0, stdDev: 0, cv: 0 };
-  const mean = data.reduce((a, b) => a + b, 0) / n;
-  const stdDev = Math.sqrt(data.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / (n > 1 ? n - 1 : 1));
+  // Filter out 'N/A' values and convert to numbers
+  const validData = data
+    .filter(v => v !== 'N/A' && v !== null && v !== undefined)
+    .map(v => parseFloat(v))
+    .filter(v => !isNaN(v));
+
+  const n = validData.length;
+  if (n === 0) return { mean: 0, stdDev: 0, cv: 0, n: 0 };
+
+  const mean = validData.reduce((a, b) => a + b, 0) / n;
+  const stdDev = Math.sqrt(validData.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / (n > 1 ? n - 1 : 1));
   const cv = mean === 0 ? 0 : (stdDev / mean) * 100;
-  return { mean, stdDev, cv };
+  return { mean, stdDev, cv, n };
 };
 
 const StatsTable = ({ reports, qcParams, parameters }) => {
@@ -40,7 +47,7 @@ const StatsTable = ({ reports, qcParams, parameters }) => {
     const relevantParams = parameters.filter(p => qcParams[p.name]);
     relevantParams.forEach(p => {
       const param = p.name;
-      const values = reports.map(r => r.values[param]).filter(v => v !== undefined && v !== null);
+      const values = reports.map(r => r.values[param]);
       results[param] = calculateStats(values);
     });
     return results;
@@ -74,10 +81,10 @@ const StatsTable = ({ reports, qcParams, parameters }) => {
                 return (
                   <tr key={param} className="border-b border-border">
                     <td className="py-2 px-4 font-semibold">{param} ({qcParams[param]?.unit || ''})</td>
-                    <td className="py-2 px-4">{reports.map(r => r.values[param]).filter(v => v !== undefined).length}</td>
-                    <td className="py-2 px-4">{stats.mean.toFixed(2)}</td>
-                    <td className="py-2 px-4">{stats.stdDev.toFixed(2)}</td>
-                    <td className="py-2 px-4">{stats.cv.toFixed(2)}%</td>
+                    <td className="py-2 px-4">{stats.n}</td>
+                    <td className="py-2 px-4">{stats.n > 0 ? stats.mean.toFixed(2) : 'N/A'}</td>
+                    <td className="py-2 px-4">{stats.n > 0 ? stats.stdDev.toFixed(2) : 'N/A'}</td>
+                    <td className="py-2 px-4">{stats.n > 0 ? stats.cv.toFixed(2) + '%' : 'N/A'}</td>
                   </tr>
                 );
               })}
@@ -146,20 +153,16 @@ const EquipmentDetailPage = () => {
     fetchReports();
   }, [equipmentId, toast]);
 
-  // Auto-select lot if there's only one active lot
+  // Auto-select the most recently created active lot
   useEffect(() => {
-    if (activeLots.length === 1) {
-      setSelectedLotId(activeLots[0].id);
-    } else if (activeLots.length > 1 && !selectedLotId) {
-      // Don't auto-select if multiple lots exist, but keep current selection if valid
-      const isCurrentValid = activeLots.some(l => l.id === selectedLotId);
-      if (!isCurrentValid) {
-        setSelectedLotId('');
-      }
-    } else if (activeLots.length === 0) {
+    if (activeLots.length > 0) {
+      // Sort by created_at descending and pick the most recent
+      const defaultLot = activeLots.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      setSelectedLotId(defaultLot.id);
+    } else {
       setSelectedLotId('');
     }
-  }, [activeLots, selectedLotId]);
+  }, [activeLots]);
 
   useEffect(() => {
     if (activeLot && activeLot.qc_params) {
@@ -289,11 +292,13 @@ const EquipmentDetailPage = () => {
   const statusInfo = getStatusInfo(currentEquipment.status);
   const StatusIcon = statusInfo.icon;
 
-  const chartData = equipmentReports.map(report => ({
-    date: new Date(report.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }),
-    value: report.values[selectedParam],
-    rules: (report.westgardRules || []).filter(r => r.includes(selectedParam)).join(', ')
-  }));
+  const chartData = equipmentReports
+    .map(report => ({
+      date: new Date(report.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }),
+      value: report.values[selectedParam],
+      rules: (report.westgardRules || []).filter(r => r.includes(selectedParam)).join(', ')
+    }))
+    .filter(entry => entry.value !== 'N/A' && entry.value !== null && entry.value !== undefined);
 
   const qcParamsForChart = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
   const canSubmit = selectedLevel && activeLot?.qc_params?.[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).length > 0 && Object.keys(activeLot.qc_params[selectedLevel]).every(param => inputValues[param]);
@@ -324,13 +329,12 @@ const EquipmentDetailPage = () => {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium">Lote Activo:</label>
+                      <label className="text-sm font-medium">{activeLots.length} Lotes Activos:</label>
                       <select
                         value={selectedLotId}
                         onChange={(e) => setSelectedLotId(e.target.value)}
                         className="p-2 border border-border rounded-md text-sm bg-white"
                       >
-                        <option value="">-- Seleccione un lote --</option>
                         {activeLots.map(lot => (
                           <option key={lot.id} value={lot.id}>
                             {lot.lotNumber} (Expira: {new Date(lot.expirationDate).toLocaleDateString('es-ES')})
@@ -403,14 +407,6 @@ const EquipmentDetailPage = () => {
                 <PackagePlus className="w-4 h-4 mr-2" /> Gestionar Lotes
               </Button>
             )}
-          </div>
-        )}
-
-        {activeLots.length > 0 && !selectedLotId && activeLots.length > 1 && (
-          <div className="medical-card rounded-xl p-8 text-center">
-            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-foreground">Seleccione un Lote</h2>
-            <p className="text-muted-foreground mt-2">Este equipo tiene múltiples lotes activos. Por favor seleccione uno en el selector de arriba para continuar.</p>
           </div>
         )}
 

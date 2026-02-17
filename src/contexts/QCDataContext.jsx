@@ -208,8 +208,11 @@ export const QCDataProvider = ({ children }) => {
 
   const addQCReport = async (reportData) => {
     // ... existing logic ...
+    // US-02: Accept 'N/A' as valid value alongside numeric entries
     const filteredValues = Object.fromEntries(
-      Object.entries(reportData.values).filter(([, value]) => value !== null && value !== '' && !isNaN(parseFloat(value)))
+      Object.entries(reportData.values).filter(([, value]) =>
+        value === 'N/A' || (value !== null && value !== '' && !isNaN(parseFloat(value)))
+      )
     );
 
     if (Object.keys(filteredValues).length === 0) return null;
@@ -252,6 +255,10 @@ export const QCDataProvider = ({ children }) => {
 
     for (const param in filteredValues) {
       const value = filteredValues[param];
+
+      // US-02: Skip Westgard analysis for 'N/A' values
+      if (value === 'N/A') continue;
+
       const qcParamsForParam = qcParamsForLevel?.[param];
 
       // Prepare history for this param
@@ -259,7 +266,7 @@ export const QCDataProvider = ({ children }) => {
       // Actually I put .reverse() above. So reportsForLotAndLevel is ASC (oldest...newest).
       // Correct.
 
-      const history = reportsForLotAndLevel.map(r => r.values[param]).filter(v => v !== undefined);
+      const history = reportsForLotAndLevel.map(r => r.values[param]).filter(v => v !== undefined && v !== 'N/A');
       const { status, triggeredRules } = applyWestgardRules(value, history, qcParamsForParam);
       if (triggeredRules.length > 0) allTriggeredRules.push(...triggeredRules.map(rule => `${rule} para ${param}`));
       if (status === 'error') finalStatus = 'error';
@@ -323,10 +330,11 @@ export const QCDataProvider = ({ children }) => {
 
       const { equipment_id: equipmentId, lot_number: lotNumber, level } = currentReport;
 
-      // 2. Filter new values (ensure they are numeric and non-empty)
+      // 2. Filter new values (ensure they are numeric and non-empty, or 'N/A')
+      // US-02: Accept 'N/A' as valid value alongside numeric entries
       const filteredValues = Object.fromEntries(
         Object.entries(newValues).filter(([, value]) =>
-          value !== null && value !== '' && !isNaN(parseFloat(value))
+          value === 'N/A' || (value !== null && value !== '' && !isNaN(parseFloat(value)))
         )
       );
 
@@ -359,11 +367,16 @@ export const QCDataProvider = ({ children }) => {
 
       // 5. Apply Westgard Rules per parameter
       for (const param in filteredValues) {
-        const value = parseFloat(filteredValues[param]);
+        const rawValue = filteredValues[param];
+
+        // US-02: Skip Westgard analysis for 'N/A' values
+        if (rawValue === 'N/A') continue;
+
+        const value = parseFloat(rawValue);
         const qcParamsForParam = qcParamsForLevel?.[param];
 
-        // Prepare history for this parameter
-        const history = historyOrdered.map(r => r.values[param]).filter(v => v !== undefined);
+        // Prepare history for this parameter (exclude 'N/A' values)
+        const history = historyOrdered.map(r => r.values[param]).filter(v => v !== undefined && v !== 'N/A');
 
         const { status, triggeredRules } = applyWestgardRules(value, history, qcParamsForParam);
 
@@ -551,23 +564,30 @@ export const QCDataProvider = ({ children }) => {
     }
   };
 
-  const activateLot = async (equipmentId, lotIdToActivate) => {
+  const toggleLotActive = async (equipmentId, lotId, currentStatus) => {
     try {
-      const { error } = await supabase.from('control_lots').update({ is_active: true }).eq('id', lotIdToActivate);
+      const newStatus = !currentStatus;
+      const { error } = await supabase
+        .from('control_lots')
+        .update({ is_active: newStatus })
+        .eq('id', lotId);
+
       if (error) throw error;
 
       setEquipment(prev => prev.map(eq => {
         if (eq.id === equipmentId) {
-          const updatedLots = eq.lots.map(lot =>
-            lot.id === lotIdToActivate ? { ...lot, isActive: true } : lot
-          );
-          return { ...eq, lots: updatedLots };
+          return {
+            ...eq,
+            lots: (eq.lots || []).map(l =>
+              l.id === lotId ? { ...l, isActive: newStatus } : l
+            )
+          };
         }
         return eq;
       }));
     } catch (err) {
-      console.error("Error activating lot:", err);
-      toast({ title: "Error", description: "No se pudo activar el lote.", variant: "destructive" });
+      console.error("Error toggling lot active status:", err);
+      toast({ title: "Error", description: "No se pudo cambiar el estado del lote.", variant: "destructive" });
     }
   };
 
@@ -693,55 +713,6 @@ export const QCDataProvider = ({ children }) => {
     }
   };
 
-  const deactivateLot = async (equipmentId) => {
-    try {
-      const { error } = await supabase
-        .from('control_lots')
-        .update({ is_active: false })
-        .eq('equipment_id', equipmentId);
-
-      if (error) throw error;
-
-      setEquipment(prev => prev.map(eq => {
-        if (eq.id === equipmentId) {
-          return {
-            ...eq,
-            lots: (eq.lots || []).map(l => ({ ...l, isActive: false }))
-          };
-        }
-        return eq;
-      }));
-    } catch (err) {
-      console.error("Error deactivating lots:", err);
-      throw err;
-    }
-  };
-
-  const deactivateSpecificLot = async (equipmentId, lotId) => {
-    try {
-      const { error } = await supabase
-        .from('control_lots')
-        .update({ is_active: false })
-        .eq('id', lotId);
-
-      if (error) throw error;
-
-      setEquipment(prev => prev.map(eq => {
-        if (eq.id === equipmentId) {
-          return {
-            ...eq,
-            lots: (eq.lots || []).map(l =>
-              l.id === lotId ? { ...l, isActive: false } : l
-            )
-          };
-        }
-        return eq;
-      }));
-    } catch (err) {
-      console.error("Error deactivating specific lot:", err);
-      throw err;
-    }
-  };
 
   const value = {
     equipment,
@@ -758,9 +729,7 @@ export const QCDataProvider = ({ children }) => {
     validateQCReport,
     addEquipment,
     addLot,
-    activateLot,
-    deactivateLot,
-    deactivateSpecificLot,
+    toggleLotActive,
     updateLotParams,
     updateEquipmentDetails,
     deleteEquipment,

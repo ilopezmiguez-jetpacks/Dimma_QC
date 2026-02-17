@@ -4,6 +4,7 @@ import { useQCData } from '@/contexts/QCDataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
     Table,
     TableBody,
@@ -29,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import {
-    Plus, Check, Save, ChevronDown, ChevronUp, Sliders,
+    Plus, Save, ChevronDown, ChevronUp, Sliders,
     Thermometer, Microscope, Beaker, PackagePlus, Loader2,
     Activity, Droplets, Syringe, Building2, Trash2, Pencil
 } from 'lucide-react';
@@ -662,7 +663,7 @@ const EditableLot = ({ lot, equipment, onSave, isAdmin, dbUnits, isProcessing, a
 const EquipmentRow = ({
     eq, isAdmin, isExpanded, toggleExpand, onActivateLot, onAddLot, onUpdateLot, onEdit,
     dbUnits, isProcessing, showLabName, availableParameters, canManageLots,
-    onDeleteLot, onEditLot, onDeactivateLot, onDeactivateSpecificLot
+    onDeleteLot, onEditLot, onDeactivateSpecificLot
 }) => {
     const [newLotForm, setNewLotForm] = useState({
         lotNumber: '',
@@ -757,18 +758,10 @@ const EquipmentRow = ({
                                                             </div>
                                                             {canManageLots && (
                                                                 <div className="flex gap-1 items-center">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-7 text-red-600 hover:text-white hover:bg-red-600 px-2 text-[10px] uppercase font-bold"
-                                                                        onClick={() => {
-                                                                            if (window.confirm('¿Seguro que desea desactivar este lote?')) {
-                                                                                onDeactivateSpecificLot(eq.id, lot.id);
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        Desactivar
-                                                                    </Button>
+                                                                    <Switch
+                                                                        checked={lot.isActive}
+                                                                        onCheckedChange={() => onDeactivateSpecificLot(eq.id, lot.id, lot.isActive)}
+                                                                    />
                                                                     <div className="h-4 w-px bg-gray-300 mx-1" />
                                                                     <Button
                                                                         variant="ghost"
@@ -830,14 +823,11 @@ const EquipmentRow = ({
                                                     <span className="text-xs text-gray-500">Expira: {new Date(lot.expirationDate).toLocaleDateString('es-ES')}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => onActivateLot(eq.id, lot.id)}
+                                                    <Switch
+                                                        checked={lot.isActive}
+                                                        onCheckedChange={() => onActivateLot(eq.id, lot.id, lot.isActive)}
                                                         disabled={isProcessing || !canManageLots}
-                                                    >
-                                                        <Check className="w-3 h-3 mr-1" /> Activar
-                                                    </Button>
+                                                    />
                                                     {canManageLots && (
                                                         <div className="flex gap-1">
                                                             <Button
@@ -923,9 +913,7 @@ const QCSettingsPage = ({ isTab = false }) => {
         equipment,
         addEquipment,
         addLot,
-        activateLot,
-        deactivateLot,
-        deactivateSpecificLot,
+        toggleLotActive,
         updateLotParams,
         updateEquipmentDetails,
         deleteLot,
@@ -1040,10 +1028,10 @@ const QCSettingsPage = ({ isTab = false }) => {
         }
     };
 
-    const handleActivateLot = async (eqId, lotId) => {
+    const handleActivateLot = async (eqId, lotId, currentStatus) => {
         setIsProcessing(true);
         try {
-            await activateLot(eqId, lotId);
+            await toggleLotActive(eqId, lotId, currentStatus);
             toast({ title: 'Éxito', description: 'Lote activado.' });
         } catch (err) {
             toast({ title: 'Error', description: 'Error al activar el lote.', variant: 'destructive' });
@@ -1094,22 +1082,10 @@ const QCSettingsPage = ({ isTab = false }) => {
         }
     };
 
-    const handleDeactivateLot = async (eqId) => {
+    const handleDeactivateSpecificLot = async (eqId, lotId, currentStatus) => {
         setIsProcessing(true);
         try {
-            await deactivateLot(eqId);
-            toast({ title: 'Lote Desactivado', description: 'El lote ha sido desactivado correctamente.' });
-        } catch (err) {
-            toast({ title: 'Error', description: 'No se pudo desactivar el lote.', variant: 'destructive' });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const handleDeactivateSpecificLot = async (eqId, lotId) => {
-        setIsProcessing(true);
-        try {
-            await deactivateSpecificLot(eqId, lotId);
+            await toggleLotActive(eqId, lotId, currentStatus);
             toast({ title: 'Lote Desactivado', description: 'El lote específico ha sido desactivado correctamente.' });
         } catch (err) {
             toast({ title: 'Error', description: 'No se pudo desactivar el lote.', variant: 'destructive' });
@@ -1187,7 +1163,6 @@ const QCSettingsPage = ({ isTab = false }) => {
                                     canManageLots={canManageLots}
                                     onDeleteLot={handleDeleteLot}
                                     onEditLot={handleEditLotClick}
-                                    onDeactivateLot={handleDeactivateLot}
                                     onDeactivateSpecificLot={handleDeactivateSpecificLot}
                                 />
                             ))

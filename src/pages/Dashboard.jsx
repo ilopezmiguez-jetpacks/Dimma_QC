@@ -435,7 +435,13 @@ const Dashboard = () => {
                   {Object.entries(selectedReport.values).map(([param, value]) => (
                     <TableRow key={param}>
                       <TableCell className="font-medium">{param}</TableCell>
-                      <TableCell className="text-right">{value}</TableCell>
+                      <TableCell className="text-right">
+                        {value === 'N/A' || value === null || value === undefined
+                          ? 'N/A'
+                          : typeof value === 'number'
+                            ? value.toFixed(2)
+                            : value}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

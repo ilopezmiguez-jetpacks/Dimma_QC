@@ -20,6 +20,7 @@ const LoadControlPage = () => {
     const [selectedLevel, setSelectedLevel] = useState('');
     const [formParams, setFormParams] = useState({});
     const [allLevelsData, setAllLevelsData] = useState({});
+    const [allLevelsNoAplica, setAllLevelsNoAplica] = useState({});
     const [lastReport, setLastReport] = useState(null);
 
     const currentEquipment = useMemo(() => equipment.find(e => e.id === selectedEquipmentId), [equipment, selectedEquipmentId]);
@@ -57,17 +58,28 @@ const LoadControlPage = () => {
     }, [location.search, equipment]);
 
     // Auto-select lot if there's only one active lot
+    // Handle stale data: reset and alert if selected lot is no longer active
     useEffect(() => {
         if (activeLots.length === 1) {
+            // Single lot: auto-select
             setSelectedLotId(activeLots[0].id);
         } else if (activeLots.length > 1) {
-            // If multiple lots, reset selection to force user to choose
-            setSelectedLotId('');
+            // Multiple lots: check if current selection is still valid
+            if (selectedLotId && !activeLots.some(lot => lot.id === selectedLotId)) {
+                // Selected lot is no longer active - alert and reset
+                toast({
+                    title: "Lote Desactivado",
+                    description: "El lote seleccionado ya no está activo. Por favor seleccione otro lote.",
+                    variant: "destructive"
+                });
+                setSelectedLotId('');
+            }
+            // If no selection or selection is still valid, do nothing (user can choose)
         } else {
-            // No active lots
+            // No active lots: reset selection
             setSelectedLotId('');
         }
-    }, [activeLots]);
+    }, [activeLots, selectedLotId, toast]);
 
     useEffect(() => {
         if (activeLot && activeLot.qc_params) {
@@ -93,6 +105,7 @@ const LoadControlPage = () => {
     // Effect B: Reset all data when equipment or lot changes
     useEffect(() => {
         setAllLevelsData({});
+        setAllLevelsNoAplica({});
     }, [currentEquipment?.id, activeLot?.lotNumber]);
 
     const handleInputChange = (param, value) => {
@@ -105,19 +118,52 @@ const LoadControlPage = () => {
         }));
     };
 
+    const handleNoAplicaChange = (param, isChecked) => {
+        setAllLevelsNoAplica(prev => ({
+            ...prev,
+            [selectedLevel]: {
+                ...prev[selectedLevel],
+                [param]: isChecked
+            }
+        }));
+
+        if (isChecked) {
+            // Set value to 'N/A' when checkbox is checked
+            setAllLevelsData(prev => ({
+                ...prev,
+                [selectedLevel]: {
+                    ...prev[selectedLevel],
+                    [param]: 'N/A'
+                }
+            }));
+        } else {
+            // Clear value when checkbox is unchecked
+            setAllLevelsData(prev => ({
+                ...prev,
+                [selectedLevel]: {
+                    ...prev[selectedLevel],
+                    [param]: ''
+                }
+            }));
+        }
+    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         const currentLevelData = allLevelsData[selectedLevel] || {};
 
-        // Validation: Every parameter in formParams must have a non-empty value in current level data
-        const missingFields = Object.keys(formParams).some(param => !currentLevelData[param] || currentLevelData[param].toString().trim() === '');
+        // Validation: Every parameter in formParams must have a non-empty value OR be 'N/A'
+        const missingFields = Object.keys(formParams).some(param => {
+            const value = currentLevelData[param];
+            return !value || (value.toString().trim() === '' && value !== 'N/A');
+        });
 
         if (missingFields) {
             toast({
                 title: "Error de Validación",
-                description: "Todos los parámetros son obligatorios. Por favor complete todos los campos.",
+                description: "Todos los parámetros son obligatorios. Por favor complete todos los campos o márquelos como 'No aplica'.",
                 variant: 'destructive',
             });
             return;
@@ -129,7 +175,7 @@ const LoadControlPage = () => {
             date: new Date().toISOString(),
             technician: user?.user_metadata?.full_name || 'Usuario Anónimo',
             level: selectedLevel,
-            values: Object.fromEntries(Object.entries(currentLevelData).map(([k, v]) => [k, parseFloat(v) || null])),
+            values: Object.fromEntries(Object.entries(currentLevelData).map(([k, v]) => [k, v === 'N/A' ? 'N/A' : (parseFloat(v) || null)])),
             dailyDeviationThreshold: currentEquipment.dailyDeviationThreshold || 2,
         };
 
@@ -151,6 +197,7 @@ const LoadControlPage = () => {
             }
             // Clear only the current level's data, preserving other levels
             setAllLevelsData(prev => ({ ...prev, [selectedLevel]: {} }));
+            setAllLevelsNoAplica(prev => ({ ...prev, [selectedLevel]: {} }));
         } else {
             toast({
                 title: "Error al Guardar",
@@ -259,6 +306,8 @@ const LoadControlPage = () => {
                                         const numSd = parseFloat(sd);
                                         const lastValue = lastReport?.values?.[param];
                                         const currentLevelData = allLevelsData[selectedLevel] || {};
+                                        const currentLevelNoAplica = allLevelsNoAplica[selectedLevel] || {};
+                                        const isNoAplica = currentLevelNoAplica[param] || false;
                                         return (
                                             <div key={param} className="relative group">
                                                 <label className="block text-sm font-medium text-gray-700">{param} <span className="text-gray-500">({unit})</span></label>
@@ -266,7 +315,30 @@ const LoadControlPage = () => {
                                                     Rango 2SD: {(!isNaN(numMean) && !isNaN(numSd) && numSd > 0) ? `${(numMean - 2 * numSd).toFixed(2)} - ${(numMean + 2 * numSd).toFixed(2)}` : 'N/A'}
                                                     {lastValue !== undefined && ` | Último: ${lastValue}`}
                                                 </p>
-                                                <input type="number" step="any" value={currentLevelData[param] || ''} onChange={(e) => handleInputChange(param, e.target.value)} className="mt-1 w-full p-2 border border-border rounded-md" placeholder={`Valor para ${param}`} />
+                                                <input
+                                                    type="number"
+                                                    step="any"
+                                                    value={currentLevelData[param] || ''}
+                                                    onChange={(e) => handleInputChange(param, e.target.value)}
+                                                    disabled={isNoAplica}
+                                                    className={`mt-1 w-full p-2 border border-border rounded-md ${isNoAplica ? 'opacity-50 bg-gray-100 cursor-not-allowed' : ''}`}
+                                                    placeholder={`Valor para ${param}`}
+                                                />
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`noaplica-${selectedLevel}-${param}`}
+                                                        checked={isNoAplica}
+                                                        onChange={(e) => handleNoAplicaChange(param, e.target.checked)}
+                                                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                                    />
+                                                    <label
+                                                        htmlFor={`noaplica-${selectedLevel}-${param}`}
+                                                        className="text-sm text-gray-600 cursor-pointer"
+                                                    >
+                                                        No aplica
+                                                    </label>
+                                                </div>
                                             </div>
                                         );
                                     })}

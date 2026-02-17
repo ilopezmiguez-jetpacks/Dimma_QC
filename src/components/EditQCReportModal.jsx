@@ -15,6 +15,7 @@ import { commonUnits } from '@/lib/parameters';
 
 const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams }) => {
   const [values, setValues] = useState({});
+  const [noAplica, setNoAplica] = useState({});
   const [newParams, setNewParams] = useState([]);
   const [currentQcParams, setCurrentQcParams] = useState({});
   const { updateQCReport, updateLotParams } = useQCData();
@@ -25,6 +26,13 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
       setValues(report.values);
       setCurrentQcParams(initialQcParams || {});
       setNewParams([]);
+
+      // Initialize noAplica state based on 'N/A' values
+      const initialNoAplica = {};
+      Object.entries(report.values).forEach(([param, value]) => {
+        initialNoAplica[param] = value === 'N/A';
+      });
+      setNoAplica(initialNoAplica);
     }
   }, [report, initialQcParams]);
 
@@ -32,6 +40,18 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
 
   const handleValueChange = (param, value) => {
     setValues(prev => ({ ...prev, [param]: value }));
+  };
+
+  const handleNoAplicaChange = (param, isChecked) => {
+    setNoAplica(prev => ({ ...prev, [param]: isChecked }));
+
+    if (isChecked) {
+      // Set value to 'N/A' when checkbox is checked
+      setValues(prev => ({ ...prev, [param]: 'N/A' }));
+    } else {
+      // Clear value when checkbox is unchecked
+      setValues(prev => ({ ...prev, [param]: '' }));
+    }
   };
 
   const handleNewParamChange = (index, field, value) => {
@@ -55,7 +75,8 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
 
     newParams.forEach(param => {
       if (param.name && param.value && param.mean && param.sd) {
-        combinedValues[param.name] = param.value;
+        // Preserve 'N/A' or convert to number
+        combinedValues[param.name] = param.value === 'N/A' ? 'N/A' : param.value;
         paramsToAddToLot[param.name] = {
           mean: parseFloat(param.mean),
           sd: parseFloat(param.sd),
@@ -80,11 +101,12 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
       await updateLotParams(report.equipmentId, report.lotId, paramsToAddToLot);
     }
 
-    const numericValues = Object.fromEntries(
-      Object.entries(combinedValues).map(([k, v]) => [k, parseFloat(v) || 0])
+    // US-03: Preserve 'N/A' values alongside numeric entries
+    const processedValues = Object.fromEntries(
+      Object.entries(combinedValues).map(([k, v]) => [k, v === 'N/A' ? 'N/A' : (parseFloat(v) || 0)])
     );
 
-    const updatedReport = await updateQCReport(report.id, numericValues);
+    const updatedReport = await updateQCReport(report.id, processedValues);
 
     onClose();
 
@@ -114,6 +136,7 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
             const paramData = currentQcParams ? currentQcParams[param] : null;
             const numMean = paramData ? parseFloat(paramData.mean) : 0;
             const numSd = paramData ? parseFloat(paramData.sd) : 0;
+            const isNoAplica = noAplica[param] || false;
             return (
               <div key={param}>
                 <label className="block text-sm font-medium text-gray-700">{param} ({paramData?.unit || 'N/A'})</label>
@@ -125,10 +148,26 @@ const EditQCReportModal = ({ report, isOpen, onClose, qcParams: initialQcParams 
                 <input
                   type="number"
                   step="any"
-                  value={values[param] || ''}
+                  value={values[param] === 'N/A' ? '' : (values[param] || '')}
                   onChange={e => handleValueChange(param, e.target.value)}
-                  className="mt-1 w-full p-2 border rounded-md"
+                  disabled={isNoAplica}
+                  className={`mt-1 w-full p-2 border rounded-md ${isNoAplica ? 'opacity-50 bg-gray-100 cursor-not-allowed' : ''}`}
                 />
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id={`noaplica-edit-${param}`}
+                    checked={isNoAplica}
+                    onChange={e => handleNoAplicaChange(param, e.target.checked)}
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                  />
+                  <label
+                    htmlFor={`noaplica-edit-${param}`}
+                    className="text-sm text-gray-600 cursor-pointer"
+                  >
+                    No aplica
+                  </label>
+                </div>
               </div>
             );
           })}

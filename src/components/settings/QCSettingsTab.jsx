@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useQCData } from '@/contexts/QCDataContext';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { Save, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
 const QCSettingsTab = () => {
-  const { equipment, updateEquipmentDetails } = useQCData();
+  const { equipment, updateEquipmentDetails, toggleLotActive } = useQCData();
   const [editableEquipment, setEditableEquipment] = useState(JSON.parse(JSON.stringify(equipment)));
   const [openLotId, setOpenLotId] = useState(null);
   const { toast } = useToast();
@@ -27,7 +28,7 @@ const QCSettingsTab = () => {
       })
     );
   };
-  
+
   const handleParamChange = (eqId, lotId, level, param, field, value) => {
     setEditableEquipment(prev =>
       prev.map(eq => {
@@ -64,19 +65,23 @@ const QCSettingsTab = () => {
     );
   };
 
-  const handleActivateLot = (eqId, lotIdToActivate) => {
-     setEditableEquipment(prev =>
-      prev.map(eq => {
-        if (eq.id === eqId) {
-          const newLots = eq.lots.map((lot) => ({
-            ...lot,
-            isActive: lot.id === lotIdToActivate
-          }));
-          return { ...eq, lots: newLots };
-        }
-        return eq;
-      })
-    );
+  const handleToggleLot = async (eqId, lotId, currentStatus) => {
+    try {
+      await toggleLotActive(eqId, lotId, currentStatus);
+      setEditableEquipment(prev =>
+        prev.map(eq => {
+          if (eq.id === eqId) {
+            const newLots = eq.lots.map(lot =>
+              lot.id === lotId ? { ...lot, isActive: !currentStatus } : lot
+            );
+            return { ...eq, lots: newLots };
+          }
+          return eq;
+        })
+      );
+    } catch {
+      toast({ title: 'Error', description: 'Could not toggle lot status.', variant: 'destructive' });
+    }
   };
 
   const handleSaveChanges = (eqId) => {
@@ -97,14 +102,22 @@ const QCSettingsTab = () => {
             <h3 className="text-xl font-semibold text-gray-800">{eq.name}</h3>
             <Button onClick={() => handleSaveChanges(eq.id)}><Save className="w-4 h-4 mr-2" />Save Changes</Button>
           </div>
-          
+
           <div className="mt-4 pt-4 border-t">
             <h4 className="text-lg font-semibold text-gray-700 mb-2">Control Lots</h4>
             {(eq.lots || []).map((lot) => (
               <div key={lot.id} className="border rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center">
-                  <div className="font-bold">{lot.lotNumber} {lot.isActive && <span className="text-green-600">(Active)</span>}</div>
-                  {!lot.isActive && <Button size="sm" onClick={() => handleActivateLot(eq.id, lot.id)}>Activate Lot</Button>}
+                  <div className="font-bold">{lot.lotNumber}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${lot.isActive ? 'text-green-600' : 'text-gray-400'}`}>
+                      {lot.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <Switch
+                      checked={lot.isActive}
+                      onCheckedChange={() => handleToggleLot(eq.id, lot.id, lot.isActive)}
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-2">
                   <div>
