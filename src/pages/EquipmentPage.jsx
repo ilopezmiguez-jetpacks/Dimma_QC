@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Plus, Search, Upload, Pencil, Save, Loader2 } from 'lucide-react';
+import { SlidersHorizontal, CheckCircle, AlertTriangle, Wrench, Plus, Search, Upload, Pencil, Save, Loader2, Trash2 } from 'lucide-react';
 import { useQCData } from '@/contexts/QCDataContext';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -13,6 +13,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,9 +36,11 @@ import {
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { hasPermission } from '@/utils/permissions';
+import { useEquipmentList } from '@/hooks/useEquipmentList';
 
 const EquipmentPage = () => {
-  const { equipment, currentLabId, laboratories, updateEquipmentDetails } = useQCData();
+  const { currentLabId, laboratories, updateEquipmentDetails, deleteEquipment } = useQCData();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -42,6 +55,17 @@ const EquipmentPage = () => {
   const [pendingCounts, setPendingCounts] = useState({});
 
   const isAdmin = user?.user_metadata?.role === 'admin';
+  const canDeleteEquipment = hasPermission(user, 'delete_equipment');
+
+  const {
+    items: equipment,
+    hasMore,
+    loading: listLoading,
+    isLoadingMore,
+    reset,
+    loadMore,
+    removeItem,
+  } = useEquipmentList({ labId: currentLabId });
 
   const params = new URLSearchParams(window.location.search);
   const initialStatus = params.get('status');
@@ -55,6 +79,13 @@ const EquipmentPage = () => {
       }
     }
   }, [initialStatus]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      reset({ searchTerm, statusFilter });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, statusFilter, currentLabId]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -76,7 +107,6 @@ const EquipmentPage = () => {
         .eq('is_validated', false);
 
       if (data) {
-        // Aggregate counts locally
         const counts = data.reduce((acc, curr) => {
           acc[curr.equipment_id] = (acc[curr.equipment_id] || 0) + 1;
           return acc;
@@ -86,21 +116,6 @@ const EquipmentPage = () => {
     };
     fetchPendingCounts();
   }, []);
-
-  const filteredEquipment = equipment.filter(eq => {
-    const matchesSearch = eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      eq.model.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (statusFilter === 'all') return matchesSearch;
-    if (statusFilter === 'issue') return matchesSearch && (eq.status === 'warning' || eq.status === 'error');
-    if (statusFilter === 'maintenance') {
-      const maintenanceDate = new Date(eq.maintenanceDue);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return matchesSearch && maintenanceDate < today;
-    }
-    return matchesSearch && eq.status === statusFilter;
-  });
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -116,14 +131,14 @@ const EquipmentPage = () => {
   };
 
   const handleEditClick = (e, eq) => {
-    e.stopPropagation(); // Prevent navigation
+    e.stopPropagation();
     setEditingEquipment({
       id: eq.id,
       name: eq.name,
       model: eq.model || '',
       serial: eq.serial || '',
-      equipment_type_id: eq.equipment_type_id || eq.equipmentTypeId || '', // Handle diverse naming if needed
-      laboratory_id: eq.laboratory_id || eq.laboratoryId || '' // Handle diverse naming
+      equipment_type_id: eq.equipment_type_id || eq.equipmentTypeId || '',
+      laboratory_id: eq.laboratory_id || eq.laboratoryId || ''
     });
     setIsEditOpen(true);
   };
@@ -132,14 +147,12 @@ const EquipmentPage = () => {
     if (!editingEquipment) return;
     setIsSaving(true);
     try {
-      // Get type name for text field consistency
       const selectedType = equipmentTypes.find(t => t.id === editingEquipment.equipment_type_id);
 
       const updates = {
         name: editingEquipment.name,
         model: editingEquipment.model,
         serial: editingEquipment.serial,
-        // Use || null to ensure empty strings become null, which is valid for UUID columns
         equipment_type_id: editingEquipment.equipment_type_id || null,
         equipment_type: selectedType ? selectedType.name : undefined,
         laboratory_id: editingEquipment.laboratory_id || null
@@ -153,25 +166,34 @@ const EquipmentPage = () => {
           .update(updates)
           .eq('id', editingEquipment.id);
         if (error) throw error;
-        // Force reload if we updated directly bypassing context
         window.location.reload();
       }
 
       toast({
-        title: "Equipo actualizado",
-        description: "Los datos del equipo han sido modificados correctamente.",
+        title: 'Equipo actualizado',
+        description: 'Los datos del equipo han sido modificados correctamente.',
       });
       setIsEditOpen(false);
       setEditingEquipment(null);
     } catch (error) {
-      console.error("Error updating equipment:", error);
+      console.error('Error updating equipment:', error);
       toast({
-        variant: "destructive",
-        title: "Error al guardar",
-        description: "No se pudo actualizar el equipo.",
+        variant: 'destructive',
+        title: 'Error al guardar',
+        description: 'No se pudo actualizar el equipo.',
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteEquipment = async (id, name) => {
+    try {
+      await deleteEquipment(id);
+      removeItem(id);
+      toast({ title: 'Equipo eliminado', description: `${name} fue eliminado.` });
+    } catch {
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: 'No se pudo eliminar el equipo.' });
     }
   };
 
@@ -206,16 +228,51 @@ const EquipmentPage = () => {
                 <Icon className="w-4 h-4" />
                 {statusInfo.text}
               </span>
-              {isAdmin && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-gray-100"
-                  onClick={(e) => handleEditClick(e, eq)}
-                >
-                  <Pencil className="w-3 h-3 text-gray-500" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 hover:bg-gray-100"
+                    onClick={(e) => handleEditClick(e, eq)}
+                  >
+                    <Pencil className="w-3 h-3 text-gray-500" />
+                  </Button>
+                )}
+                {canDeleteEquipment && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-red-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="w-3 h-3 text-red-500" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar equipo?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción no se puede deshacer. Eliminará permanentemente{' '}
+                          <strong>{eq.name}</strong> junto con todos sus lotes y reportes de
+                          control de calidad.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => handleDeleteEquipment(eq.id, eq.name)}
+                        >
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             </div>
           </div>
           <div className="space-y-2 text-sm text-muted-foreground">
@@ -243,6 +300,14 @@ const EquipmentPage = () => {
       </div>
     );
   };
+
+  if (listLoading && equipment.length === 0) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -286,9 +351,21 @@ const EquipmentPage = () => {
           </div>
         </div>
 
-        {filteredEquipment.length > 0 ? (
+        {equipment.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredEquipment.map((eq) => <EquipmentCard key={eq.id} eq={eq} />)}
+            {equipment.map((eq) => <EquipmentCard key={eq.id} eq={eq} />)}
+            {hasMore && (
+              <div className="flex justify-center pt-4 col-span-full">
+                <Button
+                  variant="outline"
+                  onClick={() => loadMore({ searchTerm, statusFilter })}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Cargar más equipos
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="medical-card rounded-xl p-12 text-center">

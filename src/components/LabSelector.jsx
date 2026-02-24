@@ -14,10 +14,16 @@ const LabSelector = () => {
   const { laboratories, currentLabId, setCurrentLabId, loading } = useQCData();
   const { user } = useAuth();
 
-  // Only admins can switch labs
-  const canSwitch = user?.user_metadata?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
+  const assignedLabs = user?.profile?.assignedLabs || [];
+
+  // Visible if admin OR if non-admin with more than 1 assigned lab
+  const canSwitch = isAdmin || assignedLabs.length > 1;
 
   if (!canSwitch || loading) return null;
+
+  // Admins see all labs; non-admins see only their assigned labs
+  const visibleLabs = isAdmin ? laboratories : assignedLabs;
 
   return (
     <div className="flex items-center gap-2">
@@ -27,8 +33,10 @@ const LabSelector = () => {
           <SelectValue placeholder="Seleccionar Laboratorio" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos los Laboratorios</SelectItem>
-          {laboratories.map((lab) => (
+          {isAdmin && (
+            <SelectItem value="all">Todos los Laboratorios</SelectItem>
+          )}
+          {visibleLabs.map((lab) => (
             <SelectItem key={lab.id} value={lab.id}>
               {lab.name}
             </SelectItem>

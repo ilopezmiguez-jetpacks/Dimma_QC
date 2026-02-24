@@ -57,9 +57,7 @@ const Layout = ({ children }) => {
           <SidebarLink to="/equipment" icon={Microscope}>Equipos</SidebarLink>
           <SidebarLink to="/load-control" icon={Upload}>Cargar Control</SidebarLink>
           <SidebarLink to="/statistics" icon={BarChart3}>Estadísticas</SidebarLink>
-          {isAdmin && (
-            <SidebarLink to="/settings" icon={Settings}>Configuración</SidebarLink>
-          )}
+          <SidebarLink to="/settings" icon={Settings}>Configuración</SidebarLink>
         </nav>
 
         <div className="absolute bottom-0 w-full p-4 border-t bg-white">
@@ -130,9 +128,7 @@ const Layout = ({ children }) => {
                     <SidebarLink to="/equipment" icon={Microscope}>Equipos</SidebarLink>
                     <SidebarLink to="/load-control" icon={Upload}>Cargar Control</SidebarLink>
                     <SidebarLink to="/statistics" icon={BarChart3}>Estadísticas</SidebarLink>
-                    {isAdmin && (
-                      <SidebarLink to="/settings" icon={Settings}>Configuración</SidebarLink>
-                    )}
+                    <SidebarLink to="/settings" icon={Settings}>Configuración</SidebarLink>
                   </nav>
 
                   <div className="p-4 border-t bg-white">

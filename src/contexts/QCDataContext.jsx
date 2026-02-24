@@ -70,25 +70,22 @@ export const QCDataProvider = ({ children }) => {
       if (!user) return;
 
       try {
-        // Fetch User's Profile to get their Lab ID
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('laboratory_id')
-          .eq('id', user.id)
-          .maybeSingle();
-
         // Fetch All Labs (for selector)
         const { data: labs, error: labsError } = await supabase.from('laboratories').select('*').eq('is_active', true);
         if (labsError) throw labsError;
         setLaboratories(labs || []);
 
-        // Determine current Lab context
+        // Determine current Lab context from assignedLabs on the auth profile
         const isAdmin = user.role === 'admin';
+        const assignedLabs = user.profile?.assignedLabs || [];
 
-        if (!isAdmin && profile?.laboratory_id) {
-          setCurrentLabId(profile.laboratory_id); // Lock to assigned lab
-        } else if (isAdmin) {
+        if (isAdmin) {
           setCurrentLabId(prev => prev === 'all' || prev ? prev : 'all');
+        } else if (assignedLabs.length > 0) {
+          setCurrentLabId(prev => {
+            const isCurrentValid = assignedLabs.some(lab => lab.id === prev);
+            return isCurrentValid ? prev : assignedLabs[0].id;
+          });
         }
 
         // Fetch Equipment Types
@@ -462,14 +459,9 @@ export const QCDataProvider = ({ children }) => {
         if (currentLabId && currentLabId !== 'all') {
           targetLabId = currentLabId;
         } else if (!isAdmin) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('laboratory_id')
-            .eq('id', user.id)
-            .single();
-
-          if (profile?.laboratory_id) {
-            targetLabId = profile.laboratory_id;
+          const firstLab = user.profile?.assignedLabs?.[0];
+          if (firstLab?.id) {
+            targetLabId = firstLab.id;
           } else {
             throw new Error("Debes estar asignado a un laboratorio para agregar equipos.");
           }

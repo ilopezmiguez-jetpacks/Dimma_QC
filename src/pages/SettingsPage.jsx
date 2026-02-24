@@ -14,15 +14,15 @@ import { useAuth } from '@/contexts/SupabaseAuthContext';
 const SettingsPage = () => {
     const { user } = useAuth();
     const [searchParams] = useSearchParams();
-    const isAdmin = user?.user_metadata?.role === 'admin';
+    const isAdmin = user?.role === 'admin';
 
     const tabsConfig = [
         { value: 'labs', icon: Building2, label: 'Laboratorios', component: <LaboratoriesPage />, adminOnly: true },
         { value: 'params-equip', icon: CircuitBoard, label: 'Parámetros por Equipo', component: <ParametrosPorEquipoPage />, adminOnly: true },
         { value: 'users-admin', icon: UserCog, label: 'Usuarios', component: <UserManagementPage />, adminOnly: true }, // New Tab
-        { value: 'equipos-lotes', icon: FileSliders, label: 'Config. Equipos', component: <QCSettingsPage isTab={true} />, adminOnly: false },
-        { value: 'general', icon: Settings, label: 'General', component: <GeneralSettingsTab />, adminOnly: false },
-        { value: 'security', icon: Shield, label: 'Seguridad', component: <SecuritySettingsTab />, adminOnly: true },
+        { value: 'equipos-lotes', icon: FileSliders, label: 'Config. Equipos', component: <QCSettingsPage isTab={true} />, adminOnly: true },
+        { value: 'general', icon: Settings, label: 'General', component: <GeneralSettingsTab />, adminOnly: true },
+        { value: 'security', icon: Shield, label: 'Seguridad', component: <SecuritySettingsTab />, adminOnly: false },
     ];
 
     const availableTabs = tabsConfig.filter(tab => !tab.adminOnly || isAdmin);

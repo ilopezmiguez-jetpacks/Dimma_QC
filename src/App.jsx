@@ -62,7 +62,7 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
-              <ProtectedRoute adminOnly={true}>
+              <ProtectedRoute>
                 <Layout>
                   <SettingsPage />
                 </Layout>

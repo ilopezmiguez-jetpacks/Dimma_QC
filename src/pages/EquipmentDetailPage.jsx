@@ -301,6 +301,33 @@ const EquipmentDetailPage = () => {
     .filter(entry => entry.value !== 'N/A' && entry.value !== null && entry.value !== undefined);
 
   const qcParamsForChart = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
+  const qcRef = (() => {
+    if (!qcParamsForChart) return null;
+    const mean = parseFloat(qcParamsForChart.mean);
+    const sd = parseFloat(qcParamsForChart.sd);
+    if (isNaN(mean) || isNaN(sd) || sd === 0) return null;
+    return {
+      mean,
+      sd,
+      plus2s: mean + 2 * sd,
+      minus2s: mean - 2 * sd,
+      plus3s: mean + 3 * sd,
+      minus3s: mean - 3 * sd,
+    };
+  })();
+  const yDomain = (() => {
+    if (!qcRef || chartData.length === 0) return undefined;
+    let yMin = qcRef.mean - 4 * qcRef.sd;
+    let yMax = qcRef.mean + 4 * qcRef.sd;
+    const values = chartData.map(d => d.value).filter(v => v != null);
+    if (values.length > 0) {
+      const dataMin = Math.min(...values);
+      const dataMax = Math.max(...values);
+      yMin = Math.min(yMin, dataMin - qcRef.sd * 0.5);
+      yMax = Math.max(yMax, dataMax + qcRef.sd * 0.5);
+    }
+    return [yMin, yMax];
+  })();
   const canSubmit = selectedLevel && activeLot?.qc_params?.[selectedLevel] && Object.keys(activeLot.qc_params[selectedLevel] || {}).length > 0 && Object.keys(activeLot.qc_params[selectedLevel]).every(param => inputValues[param]);
   const yAxisLabel = qcParamsForChart?.unit ? { value: qcParamsForChart.unit, angle: -90, position: 'insideLeft', offset: 10 } : null;
   const canDeleteEquipment = hasPermission(user, 'delete_equipment');
@@ -432,16 +459,21 @@ const EquipmentDetailPage = () => {
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
-                      <YAxis domain={['dataMin - 1', 'dataMax + 1']} label={yAxisLabel} />
+                      <YAxis
+                        domain={yDomain}
+                        ticks={qcRef ? [qcRef.minus3s, qcRef.minus2s, qcRef.mean, qcRef.plus2s, qcRef.plus3s] : undefined}
+                        label={yAxisLabel}
+                        allowDataOverflow={false}
+                      />
                       <Tooltip />
                       <Legend />
-                      {qcParamsForChart && (
+                      {qcRef && (
                         <>
-                          <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Media" stroke="black" strokeDasharray="3 3" />
-                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 2 * parseFloat(qcParamsForChart.sd)} label="+2s" stroke="orange" strokeDasharray="3 3" />
-                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 2 * parseFloat(qcParamsForChart.sd)} label="-2s" stroke="orange" strokeDasharray="3 3" />
-                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 3 * parseFloat(qcParamsForChart.sd)} label="+3s" stroke="red" strokeDasharray="3 3" />
-                          <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 3 * parseFloat(qcParamsForChart.sd)} label="-3s" stroke="red" strokeDasharray="3 3" />
+                          <ReferenceLine y={qcRef.mean} label="Media" stroke="black" strokeDasharray="3 3" />
+                          <ReferenceLine y={qcRef.plus2s} label="+2s" stroke="orange" strokeDasharray="3 3" />
+                          <ReferenceLine y={qcRef.minus2s} label="-2s" stroke="orange" strokeDasharray="3 3" />
+                          <ReferenceLine y={qcRef.plus3s} label="+3s" stroke="red" strokeDasharray="3 3" />
+                          <ReferenceLine y={qcRef.minus3s} label="-3s" stroke="red" strokeDasharray="3 3" />
                         </>
                       )}
                       <Line type="monotone" dataKey="value" name={selectedParam} stroke="hsl(var(--primary))" strokeWidth={2} />

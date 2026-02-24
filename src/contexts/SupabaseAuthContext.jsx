@@ -16,7 +16,12 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url, role, laboratory_id, laboratory:laboratories(name)')
+        .select(`
+          full_name, avatar_url, role,
+          user_laboratories (
+            laboratory:laboratories(id, name)
+          )
+        `)
         .eq('id', authUser.id)
         .maybeSingle();
 
@@ -24,7 +29,12 @@ export const AuthProvider = ({ children }) => {
         console.error("Error fetching user profile:", error.message);
         return null;
       }
-      return profile;
+
+      const assignedLabs = (profile?.user_laboratories || [])
+        .map(ul => ul.laboratory)
+        .filter(Boolean);
+
+      return { ...profile, assignedLabs };
     } catch (err) {
       console.error("Unexpected error fetching profile:", err);
       return null;

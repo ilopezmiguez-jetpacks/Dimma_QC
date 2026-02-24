@@ -5,9 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, Plus, Edit, Building2, Users } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Plus, Edit, Building2, Users, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { hasPermission } from '@/utils/permissions';
+
+const PAGE_SIZE = 20;
 
 const LaboratoriesPage = () => {
   const { user } = useAuth();
@@ -15,6 +29,9 @@ const LaboratoriesPage = () => {
   // State
   const [labs, setLabs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   // CRUD Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLab, setEditingLab] = useState(null);
@@ -33,18 +50,43 @@ const LaboratoriesPage = () => {
   const [selectedLabName, setSelectedLabName] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
 
-  // Admin Check (Consolidated)
   const isAdmin = user?.user_metadata?.role === 'admin';
+  const canDeleteLab = hasPermission(user, 'delete_laboratory');
 
-  const fetchLabs = async () => {
-    setLoading(true);
-    const { data, error } = await supabase.from('laboratories').select('*').order('created_at');
-    if (error) {
-      toast({ title: "Error", description: "Error al cargar laboratorios", variant: "destructive" });
-    } else {
-      setLabs(data || []);
+  const fetchLabs = async (cursorParam = null, append = false) => {
+    if (!append) setLoading(true);
+    else setIsLoadingMore(true);
+
+    let query = supabase
+      .from('laboratories')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(PAGE_SIZE);
+
+    if (cursorParam) {
+      query = query.or(
+        `created_at.gt.${cursorParam.created_at},and(created_at.eq.${cursorParam.created_at},id.gt.${cursorParam.id})`
+      );
     }
-    setLoading(false);
+
+    const { data, error } = await query;
+
+    if (error) {
+      toast({ title: 'Error', description: 'Error al cargar laboratorios', variant: 'destructive' });
+    } else {
+      const page = data || [];
+      setLabs(prev => append ? [...prev, ...page] : page);
+
+      const newCursor = page.length === PAGE_SIZE
+        ? { created_at: page[page.length - 1].created_at, id: page[page.length - 1].id }
+        : null;
+      setCursor(newCursor);
+      setHasMore(page.length === PAGE_SIZE);
+    }
+
+    if (!append) setLoading(false);
+    else setIsLoadingMore(false);
   };
 
   useEffect(() => {
@@ -87,11 +129,31 @@ const LaboratoriesPage = () => {
     }
 
     if (error) {
-      toast({ title: "Error", description: "No se pudo guardar el laboratorio", variant: "destructive" });
+      toast({ title: 'Error', description: 'No se pudo guardar el laboratorio', variant: 'destructive' });
     } else {
-      toast({ title: "Éxito", description: "Laboratorio guardado correctamente" });
+      toast({ title: 'Éxito', description: 'Laboratorio guardado correctamente' });
       setIsDialogOpen(false);
+      setCursor(null);
+      setLabs([]);
       fetchLabs();
+    }
+  };
+
+  const handleDeleteLab = async (lab) => {
+    const { error } = await supabase
+      .from('laboratories')
+      .delete()
+      .eq('id', lab.id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el laboratorio. Asegúrese de que no tenga equipos o usuarios asignados.',
+        variant: 'destructive',
+      });
+    } else {
+      toast({ title: 'Laboratorio eliminado', description: `"${lab.name}" fue eliminado correctamente.` });
+      setLabs(prev => prev.filter(l => l.id !== lab.id));
     }
   };
 
@@ -99,14 +161,13 @@ const LaboratoriesPage = () => {
     setSelectedLabName(lab.name);
     setUsersLoading(true);
     setIsUsersDialogOpen(true);
-    // Fetch users assigned to this lab
     const { data, error } = await supabase
       .from('profiles')
       .select('full_name, email, role')
       .eq('laboratory_id', lab.id);
 
     if (error) {
-      toast({ title: "Error", description: "No se pudieron cargar los usuarios", variant: "destructive" });
+      toast({ title: 'Error', description: 'No se pudieron cargar los usuarios', variant: 'destructive' });
       setSelectedLabUsers([]);
     } else {
       setSelectedLabUsers(data || []);
@@ -165,6 +226,34 @@ const LaboratoriesPage = () => {
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(lab)} title="Editar">
                       <Edit className="w-4 h-4 text-gray-500" />
                     </Button>
+                    {canDeleteLab && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Eliminar laboratorio">
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar laboratorio?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción es permanente. Se eliminará{' '}
+                              <strong>{lab.name}</strong>. Los equipos y usuarios que estén
+                              asignados a este laboratorio quedarán sin sede.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDeleteLab(lab)}
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -179,6 +268,19 @@ const LaboratoriesPage = () => {
           </TableBody>
         </Table>
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center pt-4">
+          <Button
+            variant="outline"
+            onClick={() => fetchLabs(cursor, true)}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Cargar más
+          </Button>
+        </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 
@@ -17,7 +16,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
         return <Navigate to="/login" replace />;
     }
 
-    const isAdmin = user.role === 'admin';
+    const isAdmin = user?.role === 'admin';
 
     if (adminOnly && !isAdmin) {
         return <Navigate to="/" replace />;

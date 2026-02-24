@@ -8,6 +8,20 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Sliders, Loader2, RefreshCw } from 'lucide-react';
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const paramName = payload[0].name;
+    return (
+      <div className="p-2 bg-white border rounded-lg shadow-lg">
+        <p className="font-bold">{`Fecha: ${label}`}</p>
+        <p className="text-sm" style={{ color: payload[0].stroke }}>{`${paramName}: ${payload[0].value}`}</p>
+        {payload[0].payload.rules && <p className="text-xs text-red-500">{`Reglas: ${payload[0].payload.rules}`}</p>}
+      </div>
+    );
+  }
+  return null;
+};
+
 const StatisticsPage = () => {
   const { equipment } = useQCData();
   const { toast } = useToast();
@@ -108,20 +122,37 @@ const StatisticsPage = () => {
     rules: (report.westgardRules || []).filter(r => r.includes(selectedParam)).join(', ')
   })), [filteredReports, selectedParam]);
 
-  const qcParamsForChart = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
+  const qcRef = useMemo(() => {
+    const raw = activeLot?.qc_params?.[selectedLevel]?.[selectedParam];
+    if (!raw) return null;
+    const mean = parseFloat(raw.mean);
+    const sd = parseFloat(raw.sd);
+    if (isNaN(mean) || isNaN(sd) || sd === 0) return null;
+    return {
+      mean,
+      sd,
+      plus1s: mean + sd,
+      minus1s: mean - sd,
+      plus2s: mean + 2 * sd,
+      minus2s: mean - 2 * sd,
+      plus3s: mean + 3 * sd,
+      minus3s: mean - 3 * sd,
+    };
+  }, [activeLot, selectedLevel, selectedParam]);
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="p-2 bg-white border rounded-lg shadow-lg">
-          <p className="font-bold">{`Fecha: ${label}`}</p>
-          <p className="text-sm" style={{ color: payload[0].stroke }}>{`${selectedParam}: ${payload[0].value}`}</p>
-          {payload[0].payload.rules && <p className="text-xs text-red-500">{`Reglas: ${payload[0].payload.rules}`}</p>}
-        </div>
-      );
+  const yDomain = useMemo(() => {
+    if (!qcRef || chartData.length === 0) return undefined;
+    let yMin = qcRef.mean - 4 * qcRef.sd;
+    let yMax = qcRef.mean + 4 * qcRef.sd;
+    const values = chartData.map(d => d.value).filter(v => v != null);
+    if (values.length > 0) {
+      const dataMin = Math.min(...values);
+      const dataMax = Math.max(...values);
+      yMin = Math.min(yMin, dataMin - qcRef.sd * 0.5);
+      yMax = Math.max(yMax, dataMax + qcRef.sd * 0.5);
     }
-    return null;
-  };
+    return [yMin, yMax];
+  }, [qcRef, chartData]);
 
   return (
     <>
@@ -174,18 +205,22 @@ const StatisticsPage = () => {
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
-                <YAxis domain={['dataMin - 1', 'dataMax + 1']} />
+                <YAxis
+                  domain={yDomain}
+                  ticks={qcRef ? [qcRef.minus3s, qcRef.minus2s, qcRef.minus1s, qcRef.mean, qcRef.plus1s, qcRef.plus2s, qcRef.plus3s] : undefined}
+                  allowDataOverflow={false}
+                />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                {qcParamsForChart && (
+                {qcRef && (
                   <>
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean)} label="Media" stroke="black" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) + parseFloat(qcParamsForChart.sd)} label="+1s" stroke="green" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) - parseFloat(qcParamsForChart.sd)} label="-1s" stroke="green" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 2 * parseFloat(qcParamsForChart.sd)} label="+2s" stroke="orange" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 2 * parseFloat(qcParamsForChart.sd)} label="-2s" stroke="orange" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) + 3 * parseFloat(qcParamsForChart.sd)} label="+3s" stroke="red" strokeDasharray="3 3" />
-                    <ReferenceLine y={parseFloat(qcParamsForChart.mean) - 3 * parseFloat(qcParamsForChart.sd)} label="-3s" stroke="red" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.mean} label="Media" stroke="black" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.plus1s} label="+1s" stroke="green" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.minus1s} label="-1s" stroke="green" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.plus2s} label="+2s" stroke="orange" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.minus2s} label="-2s" stroke="orange" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.plus3s} label="+3s" stroke="red" strokeDasharray="3 3" />
+                    <ReferenceLine y={qcRef.minus3s} label="-3s" stroke="red" strokeDasharray="3 3" />
                   </>
                 )}
                 <Line type="monotone" dataKey="value" name={selectedParam} stroke="hsl(var(--primary))" strokeWidth={2} />

@@ -11,6 +11,7 @@ export const hasPermission = (user, action) => {
 
         case 'create_user':
         case 'delete_equipment':
+        case 'delete_laboratory':
             return false; // Only admin (handled by the check above)
 
         default:

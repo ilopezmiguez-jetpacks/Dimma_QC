@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint src/pages/StatisticsPage.jsx src/pages/EquipmentDetailPage.jsx --max-warnings=0)"
+    ]
+  }
+}
