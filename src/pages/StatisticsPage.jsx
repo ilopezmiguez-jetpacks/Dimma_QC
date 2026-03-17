@@ -7,7 +7,8 @@ import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Sliders, Loader2, RefreshCw, BarChart } from 'lucide-react';
-import { calculateStats } from '@/utils/qcStats';
+import { calculateStats, calculateTotalError } from '@/utils/qcStats';
+import ParameterQualityTable from '@/components/statistics/ParameterQualityTable';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -131,7 +132,31 @@ const StatisticsPage = () => {
     const relevantParams = parameters.filter(p => qcParams[p.name]);
     relevantParams.forEach(p => {
       const values = filteredReports.map(r => r.values[p.name]);
-      results[p.name] = { ...calculateStats(values), unit: qcParams[p.name]?.unit || '' };
+      const stats = calculateStats(values);
+      const targetValue = parseFloat(qcParams[p.name]?.mean);
+      const etResult = calculateTotalError(stats.mean, targetValue, stats.cv, stats.stdDev);
+
+      let etStatus = null;
+      if (etResult && p.meta_clia != null) {
+        const cliaOk = p.meta_clia_type === 'absolute'
+          ? etResult.totalErrorAbsolute <= p.meta_clia
+          : etResult.totalErrorPercent <= p.meta_clia;
+        const eflmOk = p.meta_eflm == null || etResult.totalErrorPercent <= p.meta_eflm;
+        if (!cliaOk) etStatus = 'red';
+        else if (!eflmOk) etStatus = 'yellow';
+        else etStatus = 'green';
+      }
+
+      results[p.name] = {
+        ...stats,
+        unit: qcParams[p.name]?.unit || '',
+        targetValue,
+        et: etResult,
+        etStatus,
+        metaClia: p.meta_clia,
+        metaCliaType: p.meta_clia_type || 'percent',
+        metaEflm: p.meta_eflm,
+      };
     });
     return results;
   }, [filteredReports, selectedLot, selectedLevel, parameters]);
@@ -275,6 +300,7 @@ const StatisticsPage = () => {
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2 mb-4">
               <BarChart className="w-5 h-5" /> Resumen Estadístico
             </h2>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-secondary text-muted-foreground uppercase">
@@ -284,6 +310,7 @@ const StatisticsPage = () => {
                     <th className="py-2 px-4">Media (X&#772;)</th>
                     <th className="py-2 px-4">SD</th>
                     <th className="py-2 px-4">CV%</th>
+                    <th className="py-2 px-4">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,6 +323,19 @@ const StatisticsPage = () => {
                       <td className="py-2 px-4">{stats.n > 0 ? stats.mean.toFixed(2) : 'N/A'}</td>
                       <td className="py-2 px-4">{stats.n > 0 ? stats.stdDev.toFixed(2) : 'N/A'}</td>
                       <td className="py-2 px-4">{stats.n > 0 ? stats.cv.toFixed(2) + '%' : 'N/A'}</td>
+                      <td className="py-2 px-4 text-center">
+                        {stats.etStatus ? (
+                          <span className={`inline-block w-4 h-4 rounded-full ${
+                            stats.etStatus === 'green' ? 'bg-green-500' :
+                            stats.etStatus === 'yellow' ? 'bg-yellow-400' : 'bg-red-500'
+                          }`} title={
+                            stats.etStatus === 'green' ? 'Cumple EFLM y CLIA' :
+                            stats.etStatus === 'yellow' ? 'Excede EFLM, cumple CLIA' : 'Excede CLIA'
+                          } />
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -303,6 +343,16 @@ const StatisticsPage = () => {
             </div>
           </motion.div>
         )}
+
+        <ParameterQualityTable
+          statsByParam={statsByParam}
+          context={{
+            equipmentName: currentEquipment?.name || '',
+            lotNumber: selectedLot?.lotNumber || '',
+            level: selectedLevel,
+            dateRange,
+          }}
+        />
       </div>
     </>
   );
