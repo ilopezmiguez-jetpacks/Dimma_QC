@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
 const ResetPasswordPage = () => {
-  const { clearPasswordRecovery } = useAuth();
+  const { clearPasswordRecovery, passwordRecovery } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -19,6 +19,12 @@ const ResetPasswordPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // Fast path: AuthProvider already handled the PASSWORD_RECOVERY event
+    if (passwordRecovery) {
+      setRecoveryReady(true);
+      return;
+    }
+
     let cancelled = false;
     let timeout;
 
@@ -58,10 +64,18 @@ const ResetPasswordPage = () => {
         return;
       }
 
-      // 4. Nothing worked — timeout and redirect
-      //    (no extra onAuthStateChange — AuthProvider already has one)
+      // 4. Listen for PASSWORD_RECOVERY event fired by Supabase after processing the URL
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY' && !cancelled) {
+          setRecoveryReady(true);
+          subscription.unsubscribe();
+        }
+      });
+
+      // 5. Nothing worked after timeout — redirect to login
       timeout = setTimeout(() => {
         if (cancelled) return;
+        subscription.unsubscribe();
         toast({
           title: 'Enlace invalido',
           description: 'El enlace de recuperacion no es valido o ha expirado.',
@@ -69,6 +83,8 @@ const ResetPasswordPage = () => {
         });
         navigate('/login');
       }, 10000);
+
+      return () => subscription.unsubscribe();
     };
 
     init();
@@ -77,7 +93,7 @@ const ResetPasswordPage = () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [navigate, toast]);
+  }, [passwordRecovery, navigate, toast]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
